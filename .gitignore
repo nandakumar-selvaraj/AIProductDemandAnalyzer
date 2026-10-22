@@ -1,0 +1,34 @@
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+
+# Python environments, caches, and test output
+.venv/
+venv/
+**/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+
+# Downloaded datasets and generated reports
+backend/data/raw/*
+!backend/data/raw/.gitkeep
+*.log
+*.tmp
+*.upload
+
+# Angular dependencies and build output
+ui/node_modules/
+ui/dist/
+ui/.angular/cache/
+
+# Editor and OS files
+.vscode/
+.idea/
+.vs/
+.DS_Store
+Thumbs.db
