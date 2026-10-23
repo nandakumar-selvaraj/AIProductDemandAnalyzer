@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer backend
 
-FastAPI service for sales ingestion and summaries, trailing-average demand forecasting, paginated forecast prediction retrieval, and forecast accuracy evaluation. Stock recommendations, inventory population, authentication, and AI features are outside this phase.
+FastAPI service for sales ingestion and summaries, trailing-average demand forecasting, paginated forecast prediction retrieval, forecast accuracy evaluation, and forecast-based demand trend recommendations. On-hand inventory, purchase orders, lead times, costs, authentication, and AI features are not available in this phase.
 
 ## Stack and layout
 
@@ -85,6 +85,38 @@ python -m uvicorn app.main:app --reload
 - Forecast creation: `POST /api/v1/forecasts` with `{"horizon_days": 30}` creates a forecast run and daily predictions. `horizon_days` defaults to 30 and accepts 1–30; optional `start_date` sets the historical cutoff and cannot be after the latest sales date.
 - Forecast predictions: `GET /api/v1/forecasts/{run_id}/predictions?page=1&page_size=50` reads saved predictions for a run. `page` starts at 1; `page_size` defaults to 50 and ranges from 1 to 500. Results are ordered by forecast date, store ID, product ID, then prediction ID. Unknown run IDs return 404; a valid run with no predictions returns an empty list.
 - Forecast evaluation: `POST /api/v1/forecasts/evaluate` with `{"forecast_run_id": 1}` evaluates only completed runs by matching saved predictions to actual sales for the same store, product, and forecast date. Missing actuals count as unmatched. Missing runs return 404, non-completed runs return 409, invalid requests return 422, and database failures return 503.
+- Inventory recommendations: `GET /api/v1/recommendations?forecast_run_id=1&page=1&page_size=50` calculates forecast-based demand trends. The run ID is required and positive; page starts at 1; page size defaults to 50 and is capped at 500. Results are stably ordered by store then product. Missing runs return 404, incomplete runs 409, invalid parameters 422, and database failures 503.
+
+Example recommendation response:
+
+```json
+{
+  "forecast_run_id": 1,
+  "page": 1,
+  "page_size": 50,
+  "total_records": 1,
+  "total_pages": 1,
+  "increase_threshold_percent": "10",
+  "reduce_threshold_percent": "-10",
+  "items": [
+    {
+      "store_id": 1,
+      "product_id": 2,
+      "recommendation": "increase",
+      "reason": "Forecast daily demand is at least the increase threshold above history.",
+      "historical_daily_average": "10",
+      "forecast_daily_average": "12",
+      "change_percent": "20",
+      "forecast_horizon_days": 30,
+      "historical_coverage_days": 30,
+      "historical_window_start": "2017-12-02",
+      "historical_window_end": "2017-12-31"
+    }
+  ]
+}
+```
+
+Increase is recommended at or above +10%, reduce at or below -10%, and maintain between those thresholds. Thresholds are configurable with `RECOMMENDATION_INCREASE_THRESHOLD_PERCENT` and `RECOMMENDATION_REDUCE_THRESHOLD_PERCENT` settings. Recommendations require all 30 historical sales dates and the entire forecast horizon; missing rows are not treated as zero, and incomplete series return `insufficient_data`. These are demand trend signals only: the source data has no on-hand balances, purchase orders, lead times, or costs, so no order quantity or overstock claim is produced.
 
 Example evaluation response:
 

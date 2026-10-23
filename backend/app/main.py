@@ -17,8 +17,9 @@ app = FastAPI(
         "Backend API for importing and summarizing historical product sales and checking "
         "service health. Sales ingestion accepts the Kaggle competition CSV schema. Forecast "
         "runs use a trailing-average baseline; persisted predictions can be retrieved with "
-        "pagination and evaluated against matching actual sales. "
-        "Stock recommendations and authentication are not implemented in this version."
+        "pagination and evaluated against matching actual sales. Demand-trend recommendations "
+        "are available from persisted forecasts and sales history. Authentication is not "
+        "implemented in this version."
     ),
     version="0.1.0",
     docs_url="/docs",
@@ -42,6 +43,13 @@ app = FastAPI(
             "description": (
                 "Create trailing-average forecast runs, retrieve paginated persisted predictions, "
                 "and evaluate completed runs against matching actual sales."
+            ),
+        },
+        {
+            "name": "Recommendations",
+            "description": (
+                "Forecast-based demand trend recommendations with historical coverage; exact "
+                "inventory quantities are not inferred."
             ),
         },
     ],
