@@ -1,5 +1,6 @@
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 
 def test_openapi_documents_all_implemented_endpoints_and_csv_upload() -> None:
@@ -8,9 +9,12 @@ def test_openapi_documents_all_implemented_endpoints_and_csv_upload() -> None:
     assert "/api/v1/health" in paths
     assert "/api/v1/ready" in paths
     assert "post" in paths["/api/v1/forecasts"]
+    assert "get" in paths["/api/v1/forecasts/{run_id}/predictions"]
     upload = paths["/api/v1/ingestion/sales"]["post"]
     assert upload["requestBody"]["content"]["multipart/form-data"]
-    assert {"Health", "Data Ingestion"}.issubset({tag["name"] for tag in specification["tags"]})
+    assert {"Health", "Data Ingestion", "Sales", "Forecasts"}.issubset(
+        {tag["name"] for tag in specification["tags"]}
+    )
     assert {"413", "415", "422", "503"}.issubset(upload["responses"])
 
 

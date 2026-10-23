@@ -1,13 +1,18 @@
 import logging
+from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.forecast import ForecastRequest, ForecastRunResponse
+from app.schemas.forecast import (
+    ForecastPredictionsResponse,
+    ForecastRequest,
+    ForecastRunResponse,
+)
 from app.schemas.ingestion import ErrorResponse
-from app.services.forecast_service import create_forecast
+from app.services.forecast_service import create_forecast, get_forecast_predictions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/forecasts", tags=["Forecasts"])
@@ -50,4 +55,48 @@ def post_forecast(
         created_at=run.created_at,
         started_at=run.started_at,
         completed_at=run.completed_at,
+    )
+
+
+@router.get(
+    "/{run_id}/predictions",
+    response_model=ForecastPredictionsResponse,
+    summary="List persisted forecast predictions",
+    description=(
+        "Returns stored predictions in ascending forecast date, store ID, product ID, "
+        "and prediction ID order. A valid run with no predictions returns an empty items list."
+    ),
+    responses={
+        404: {"model": ErrorResponse, "description": "Forecast run does not exist"},
+        422: {"description": "Invalid run ID or pagination parameters"},
+        503: {"model": ErrorResponse, "description": "Database is unavailable"},
+    },
+)
+def list_forecast_predictions(
+    run_id: int = Path(..., gt=0, description="Forecast run identifier"),
+    page: int = Query(default=1, ge=1, description="Page number, starting at 1"),
+    page_size: int = Query(default=50, ge=1, le=500, description="Records per page (maximum 500)"),
+    session: Session = Depends(get_db),
+) -> ForecastPredictionsResponse:
+    try:
+        result = get_forecast_predictions(session, run_id, page, page_size)
+    except SQLAlchemyError as exc:
+        logger.exception("Forecast predictions query failed")
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "database_error", "message": "Forecast predictions are unavailable"},
+        ) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "forecast_not_found", "message": "Forecast run was not found"},
+        )
+    total, predictions = result
+    return ForecastPredictionsResponse(
+        run_id=run_id,
+        page=page,
+        page_size=page_size,
+        total_records=total,
+        total_pages=ceil(total / page_size) if total else 0,
+        items=predictions,
     )

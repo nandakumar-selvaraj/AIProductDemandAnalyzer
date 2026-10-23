@@ -15,9 +15,9 @@ app = FastAPI(
     title="AI Product Demand Analyzer API",
     description=(
         "Backend API for importing and summarizing historical product sales and checking "
-        "service health. "
-        "Sales ingestion accepts the Kaggle competition CSV schema. Forecasting, stock "
-        "recommendations, and authentication are not implemented in this version."
+        "service health. Sales ingestion accepts the Kaggle competition CSV schema; baseline "
+        "forecasting and paginated retrieval of persisted daily predictions are implemented. "
+        "Stock recommendations and authentication are not implemented in this version."
     ),
     version="0.1.0",
     docs_url="/docs",
@@ -35,6 +35,10 @@ app = FastAPI(
         {
             "name": "Sales",
             "description": "Aggregated sales reporting for ingested history.",
+        },
+        {
+            "name": "Forecasts",
+            "description": "Create forecast runs and retrieve their persisted daily predictions.",
         },
     ],
 )

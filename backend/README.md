@@ -83,6 +83,29 @@ python -m uvicorn app.main:app --reload
 - Sales upload: `POST /api/v1/ingestion/sales` with multipart field `file` (25 MiB default maximum; configure with `MAX_UPLOAD_BYTES`)
 - Sales summary: `GET /api/v1/sales/summary` returns the earliest/latest sales dates, total units sold, distinct stores and products with sales, and daily totals.
 - Forecast creation: `POST /api/v1/forecasts` with `{"horizon_days": 30}` creates a forecast run and daily predictions. `horizon_days` defaults to 30 and accepts 1–30; optional `start_date` sets the historical cutoff and cannot be after the latest sales date.
+- Forecast predictions: `GET /api/v1/forecasts/{run_id}/predictions?page=1&page_size=50` reads saved predictions for a run. `page` starts at 1; `page_size` defaults to 50 and ranges from 1 to 500. Results are ordered by forecast date, store ID, product ID, then prediction ID. Unknown run IDs return 404; a valid run with no predictions returns an empty list.
+
+Example forecast-predictions response:
+
+```json
+{
+  "run_id": 1,
+  "page": 1,
+  "page_size": 50,
+  "total_records": 1,
+  "total_pages": 1,
+  "items": [
+    {
+      "id": 1,
+      "forecast_run_id": 1,
+      "store_id": 1,
+      "product_id": 1,
+      "forecast_date": "2018-01-01",
+      "predicted_units": "12.5"
+    }
+  ]
+}
+```
 
 Forecast baseline example response:
 

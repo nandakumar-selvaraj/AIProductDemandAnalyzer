@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,3 +24,25 @@ class ForecastRunResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
+
+class ForecastPredictionItem(BaseModel):
+    """Persisted daily prediction fields from ProductForecast."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    forecast_run_id: int
+    store_id: int
+    product_id: int
+    forecast_date: date
+    predicted_units: Decimal
+
+
+class ForecastPredictionsResponse(BaseModel):
+    run_id: int
+    page: int
+    page_size: int
+    total_records: int
+    total_pages: int
+    items: list[ForecastPredictionItem]

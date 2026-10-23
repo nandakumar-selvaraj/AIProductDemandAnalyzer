@@ -22,6 +22,30 @@ def get_forecast_dates(cutoff: date, horizon_days: int) -> list[date]:
     return [cutoff + timedelta(days=offset) for offset in range(1, horizon_days + 1)]
 
 
+def get_forecast_predictions(
+    session: Session, run_id: int, page: int, page_size: int
+) -> tuple[int, list[ProductForecast]] | None:
+    """Return page of persisted predictions, or None when the run is missing."""
+    run_exists = session.scalar(select(ForecastRun.id).where(ForecastRun.id == run_id))
+    if run_exists is None:
+        return None
+    filters = ProductForecast.forecast_run_id == run_id
+    total = session.scalar(select(func.count()).select_from(ProductForecast).where(filters)) or 0
+    items = session.scalars(
+        select(ProductForecast)
+        .where(filters)
+        .order_by(
+            ProductForecast.forecast_date,
+            ProductForecast.store_id,
+            ProductForecast.product_id,
+            ProductForecast.id,
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return total, items
+
+
 def create_forecast(
     session: Session, horizon_days: int, start_date: date | None = None
 ) -> ForecastRun:
