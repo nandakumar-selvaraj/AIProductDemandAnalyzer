@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx==0.28.1", "pytest==8.4.2", "ruff==0.14.3"]
+dev = ["httpx==0.28.1", "pytest==8.4.2", "pytest-cov==7.1.0", "ruff==0.14.3"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

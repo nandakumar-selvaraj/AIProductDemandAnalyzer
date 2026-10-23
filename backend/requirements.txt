@@ -4,6 +4,7 @@ httpx==0.28.1
 psycopg[binary]==3.3.6
 pydantic-settings==2.11.0
 pytest==8.4.2
+pytest-cov==7.1.0
 python-multipart==0.0.20
 ruff==0.14.3
 sqlalchemy==2.0.43

@@ -199,12 +199,16 @@ Swagger and ReDoc are enabled for local development. Before production deploymen
 
 ## Tests and code quality
 
-Use a dedicated test database before adding database-backed integration tests; never point tests at a normal development database. Current unit and health tests use fixtures and do not download data.
+Database integration tests are opt-in and require a dedicated PostgreSQL database whose name ends in `_test`; never point tests at a normal development database. Set `TEST_DATABASE_URL` to that database URL to enable the PostgreSQL ingestion integration test. GitHub Actions provisions an isolated PostgreSQL service, applies Alembic migrations, and runs this test on every push and pull request. Unit tests use isolated fixtures and do not download data.
 
 ```powershell
 pytest
+pytest --cov=app --cov-report=term-missing --cov-report=html
 ruff check .
 ruff format --check .
+alembic current
 ```
+
+The coverage command reports total application coverage and missing source lines, including endpoint and service modules. Open `htmlcov/index.html` for the detailed HTML report. CI also uploads `coverage.xml` as a workflow artifact.
 
 Common problems: `ModuleNotFoundError` usually means the wrong VS Code interpreter is selected; connection refused means PostgreSQL is stopped or `DATABASE_URL` is wrong; Alembic configuration errors usually mean commands were run outside `backend/`; invalid Kaggle rows are listed in the CLI summary and cause a non-zero exit code.
