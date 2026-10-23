@@ -85,6 +85,15 @@ python -m uvicorn app.main:app --reload
 - Forecast creation: `POST /api/v1/forecasts` with `{"horizon_days": 30}` creates a forecast run and daily predictions. `horizon_days` defaults to 30 and accepts 1–30; optional `start_date` sets the historical cutoff and cannot be after the latest sales date.
 - Forecast predictions: `GET /api/v1/forecasts/{run_id}/predictions?page=1&page_size=50` reads saved predictions for a run. `page` starts at 1; `page_size` defaults to 50 and ranges from 1 to 500. Results are ordered by forecast date, store ID, product ID, then prediction ID. Unknown run IDs return 404; a valid run with no predictions returns an empty list.
 - Forecast evaluation: `POST /api/v1/forecasts/evaluate` with `{"forecast_run_id": 1}` evaluates only completed runs by matching saved predictions to actual sales for the same store, product, and forecast date. Missing actuals count as unmatched. Missing runs return 404, non-completed runs return 409, invalid requests return 422, and database failures return 503.
+- Latest forecast: `GET /api/v1/forecasts/latest` returns the newest completed run or JSON `null` when none exists.
+- Forecast run history: `GET /api/v1/forecasts/runs?page=1&page_size=50&status=completed` returns stable paginated runs; status is optional.
+- Products: `GET /api/v1/products?page=1&page_size=50&search=ITEM_1` searches item code and name.
+- Stores: `GET /api/v1/stores?page=1&page_size=50&search=STORE_1` searches store code and name.
+- Product analytics: `GET /api/v1/products/{product_id}/analytics?store_id=1&start_date=2017-01-01&end_date=2017-12-31` returns daily/monthly totals and observed-date coverage. The default window is the most recent 365 calendar days available for the product; explicit ranges are capped at 365 days.
+- Dashboard: `GET /api/v1/dashboard/summary` returns counts and historical monthly sales plus metadata for the latest completed forecast, or `latest_forecast: null` when unavailable.
+- Historical backtest: `POST /api/v1/forecasts/backtest` with `{"cutoff_date":"2017-11-30","horizon_days":30}` compares trailing-average and seasonal-naive baselines. The holdout window must have at least one recorded sale on every date.
+
+Backtests are calculated on demand and are not persisted. Both models are generated from data on or before the cutoff; holdout actuals are queried only after prediction generation. The trailing average requires all 30 training dates. Seasonal naive repeats the last observed corresponding weekday and requires the preceding seven training dates. Missing values are never imputed as zero. Metrics include matched/unmatched predictions and series; WAPE is null if matched actual demand is zero. Backtests establish measured results but do not select a superior model automatically.
 - Inventory recommendations: `GET /api/v1/recommendations?forecast_run_id=1&page=1&page_size=50` calculates forecast-based demand trends. The run ID is required and positive; page starts at 1; page size defaults to 50 and is capped at 500. Results are stably ordered by store then product. Missing runs return 404, incomplete runs 409, invalid parameters 422, and database failures 503.
 
 Example recommendation response:
@@ -116,7 +125,7 @@ Example recommendation response:
 }
 ```
 
-Increase is recommended at or above +10%, reduce at or below -10%, and maintain between those thresholds. Thresholds are configurable with `RECOMMENDATION_INCREASE_THRESHOLD_PERCENT` and `RECOMMENDATION_REDUCE_THRESHOLD_PERCENT` settings. Recommendations require all 30 historical sales dates and the entire forecast horizon; missing rows are not treated as zero, and incomplete series return `insufficient_data`. These are demand trend signals only: the source data has no on-hand balances, purchase orders, lead times, or costs, so no order quantity or overstock claim is produced.
+Recommendations are calculated on demand and are not written to `stock_recommendations`; that table requires inventory values absent from the source data. Increase is recommended at or above +10%, reduce at or below -10%, and maintain between those thresholds. Thresholds are configurable with `RECOMMENDATION_INCREASE_THRESHOLD_PERCENT` and `RECOMMENDATION_REDUCE_THRESHOLD_PERCENT` settings. Recommendations require all 30 historical sales dates and the entire forecast horizon; missing rows are not treated as zero, and incomplete series return `insufficient_data`. These are demand trend signals only: the source data has no on-hand balances, purchase orders, lead times, or costs, so no order quantity or overstock claim is produced.
 
 Example evaluation response:
 

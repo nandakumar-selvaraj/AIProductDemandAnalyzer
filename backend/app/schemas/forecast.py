@@ -88,3 +88,26 @@ class ForecastEvaluationResponse(BaseModel):
         ),
         examples=["complete", "partial", "unavailable"],
     )
+
+
+class ForecastRunItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    model_name: str
+    model_version: str | None
+    training_cutoff: date
+    horizon_days: int
+    status: str
+    started_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    metrics_json: dict[str, object] | None
+
+
+class ForecastRunPage(BaseModel):
+    page: int
+    page_size: int
+    total_records: int
+    total_pages: int
+    items: list[ForecastRunItem]

@@ -20,7 +20,12 @@ def client_and_session():
     )
     Base.metadata.create_all(engine)
     session = Session(engine)
-    app.dependency_overrides[get_db] = lambda: session
+
+    def override_get_db():
+        with Session(engine) as request_session:
+            yield request_session
+
+    app.dependency_overrides[get_db] = override_get_db
     try:
         yield TestClient(app), session
     finally:

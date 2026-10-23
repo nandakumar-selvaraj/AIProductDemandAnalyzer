@@ -6,22 +6,90 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.schemas.backtest import BacktestRequest, BacktestResponse
 from app.schemas.forecast import (
     ForecastEvaluationRequest,
     ForecastEvaluationResponse,
     ForecastPredictionsResponse,
     ForecastRequest,
+    ForecastRunItem,
+    ForecastRunPage,
     ForecastRunResponse,
 )
 from app.schemas.ingestion import ErrorResponse
+from app.services.backtest_service import run_backtest
 from app.services.forecast_service import (
     create_forecast,
     evaluate_forecast,
     get_forecast_predictions,
+    get_forecast_runs,
+    get_latest_completed_forecast,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/forecasts", tags=["Forecasts"])
+
+
+@router.get(
+    "/latest", response_model=ForecastRunItem | None, summary="Get latest completed forecast"
+)
+def latest_forecast(session: Session = Depends(get_db)) -> ForecastRunItem | None:
+    try:
+        run = get_latest_completed_forecast(session)
+        return ForecastRunItem.model_validate(run) if run else None
+    except SQLAlchemyError as exc:
+        logger.exception("Latest forecast query failed")
+        raise HTTPException(
+            503, detail={"code": "database_error", "message": "Forecast is unavailable"}
+        ) from exc
+
+
+@router.get("/runs", response_model=ForecastRunPage, summary="List forecast runs")
+def list_forecast_runs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    status: str | None = Query(None, pattern="^(pending|running|completed|failed)$"),
+    session: Session = Depends(get_db),
+) -> ForecastRunPage:
+    try:
+        total, runs = get_forecast_runs(session, page, page_size, status)
+        return ForecastRunPage(
+            page=page,
+            page_size=page_size,
+            total_records=total,
+            total_pages=ceil(total / page_size) if total else 0,
+            items=[ForecastRunItem.model_validate(run) for run in runs],
+        )
+    except SQLAlchemyError as exc:
+        logger.exception("Forecast run list query failed")
+        raise HTTPException(
+            503, detail={"code": "database_error", "message": "Forecast runs unavailable"}
+        ) from exc
+
+
+@router.post(
+    "/backtest",
+    response_model=BacktestResponse,
+    summary="Backtest forecast baselines",
+    description=(
+        "Compares trailing-30-day average and weekday seasonal-naive predictions at a historical "
+        "cutoff. Models use training records only; holdout actuals are queried afterward. "
+        "Missing actuals are unmatched, never zero-filled."
+    ),
+)
+def forecast_backtest(
+    request: BacktestRequest, session: Session = Depends(get_db)
+) -> BacktestResponse:
+    try:
+        result = run_backtest(session, request.cutoff_date, request.horizon_days)
+        return BacktestResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(422, detail={"code": "invalid_backtest", "message": str(exc)}) from exc
+    except SQLAlchemyError as exc:
+        logger.exception("Forecast backtest query failed")
+        raise HTTPException(
+            503, detail={"code": "database_error", "message": "Backtest unavailable"}
+        ) from exc
 
 
 @router.post(

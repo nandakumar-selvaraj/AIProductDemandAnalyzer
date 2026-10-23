@@ -46,6 +46,28 @@ def get_forecast_predictions(
     return total, items
 
 
+def get_forecast_runs(session: Session, page: int, page_size: int, status: str | None):
+    filters = [ForecastRun.status == status] if status else []
+    total = session.scalar(select(func.count()).select_from(ForecastRun).where(*filters)) or 0
+    rows = session.scalars(
+        select(ForecastRun)
+        .where(*filters)
+        .order_by(ForecastRun.created_at.desc(), ForecastRun.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return total, rows
+
+
+def get_latest_completed_forecast(session: Session) -> ForecastRun | None:
+    return session.scalar(
+        select(ForecastRun)
+        .where(ForecastRun.status == "completed")
+        .order_by(ForecastRun.completed_at.desc().nullslast(), ForecastRun.id.desc())
+        .limit(1)
+    )
+
+
 def evaluate_forecast(
     session: Session, run_id: int
 ) -> tuple[ForecastRun, dict[str, object]] | None:
