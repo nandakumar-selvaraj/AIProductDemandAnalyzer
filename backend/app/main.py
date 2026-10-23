@@ -14,7 +14,8 @@ configure_logging()
 app = FastAPI(
     title="AI Product Demand Analyzer API",
     description=(
-        "Backend API for importing historical product sales and checking service health. "
+        "Backend API for importing and summarizing historical product sales and checking "
+        "service health. "
         "Sales ingestion accepts the Kaggle competition CSV schema. Forecasting, stock "
         "recommendations, and authentication are not implemented in this version."
     ),
@@ -30,6 +31,10 @@ app = FastAPI(
         {
             "name": "Data Ingestion",
             "description": "Validated CSV upload and repeatable sales ingestion.",
+        },
+        {
+            "name": "Sales",
+            "description": "Aggregated sales reporting for ingested history.",
         },
     ],
 )

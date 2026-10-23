@@ -81,6 +81,7 @@ python -m uvicorn app.main:app --reload
 - Health: `http://127.0.0.1:8000/api/v1/health` (process only)
 - Readiness: `http://127.0.0.1:8000/api/v1/ready` (checks PostgreSQL)
 - Sales upload: `POST /api/v1/ingestion/sales` with multipart field `file` (25 MiB default maximum; configure with `MAX_UPLOAD_BYTES`)
+- Sales summary: `GET /api/v1/sales/summary` returns the earliest/latest sales dates, total units sold, distinct stores and products with sales, and daily totals.
 
 The ingestion upload is unauthenticated for local development. Implement real authentication and authorization before exposing it to untrusted clients.
 
