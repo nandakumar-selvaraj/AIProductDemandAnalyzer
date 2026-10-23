@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer backend
 
-FastAPI service, PostgreSQL schema, and repeatable Kaggle sales ingestion. Forecasting, recommendations, inventory population, authentication, and AI features are outside this phase.
+FastAPI service for sales ingestion and summaries, trailing-average demand forecasting, paginated forecast prediction retrieval, and forecast accuracy evaluation. Stock recommendations, inventory population, authentication, and AI features are outside this phase.
 
 ## Stack and layout
 
@@ -84,6 +84,28 @@ python -m uvicorn app.main:app --reload
 - Sales summary: `GET /api/v1/sales/summary` returns the earliest/latest sales dates, total units sold, distinct stores and products with sales, and daily totals.
 - Forecast creation: `POST /api/v1/forecasts` with `{"horizon_days": 30}` creates a forecast run and daily predictions. `horizon_days` defaults to 30 and accepts 1–30; optional `start_date` sets the historical cutoff and cannot be after the latest sales date.
 - Forecast predictions: `GET /api/v1/forecasts/{run_id}/predictions?page=1&page_size=50` reads saved predictions for a run. `page` starts at 1; `page_size` defaults to 50 and ranges from 1 to 500. Results are ordered by forecast date, store ID, product ID, then prediction ID. Unknown run IDs return 404; a valid run with no predictions returns an empty list.
+- Forecast evaluation: `POST /api/v1/forecasts/evaluate` with `{"forecast_run_id": 1}` evaluates only completed runs by matching saved predictions to actual sales for the same store, product, and forecast date. Missing actuals count as unmatched. Missing runs return 404, non-completed runs return 409, invalid requests return 422, and database failures return 503.
+
+Example evaluation response:
+
+```json
+{
+  "forecast_run_id": 1,
+  "forecast_cutoff": "2017-12-31",
+  "horizon_days": 30,
+  "total_predictions": 15000,
+  "evaluated_predictions": 14500,
+  "unmatched_predictions": 500,
+  "coverage_percent": "96.66666666666666666666666667",
+  "total_actual_units": 180000,
+  "total_predicted_units": "177500.000",
+  "mae": "2.5",
+  "wape_percent": "8.75",
+  "evaluation_status": "partial"
+}
+```
+
+`total_predictions` includes every stored prediction for the run. Evaluation joins actual sales only when the store, product, and date match and the date is after the training cutoff and within the run horizon. MAE is the mean absolute difference in units across matched predictions. WAPE is summed absolute error divided by total actual units, multiplied by 100; it is null when there are no matches or total actual units are zero. `coverage_percent` is evaluated predictions divided by total predictions × 100 (0 when there are no predictions). Evaluation status is `complete` when all predictions match, `partial` when some match, and `unavailable` when none match or no predictions exist.
 
 Example forecast-predictions response:
 

@@ -3,7 +3,7 @@
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models import ForecastRun, ForecastRunLog, ProductForecast, SalesHistory
@@ -44,6 +44,78 @@ def get_forecast_predictions(
         .limit(page_size)
     ).all()
     return total, items
+
+
+def evaluate_forecast(
+    session: Session, run_id: int
+) -> tuple[ForecastRun, dict[str, object]] | None:
+    """Aggregate prediction accuracy against actual sales on forecast dates only."""
+    run = session.get(ForecastRun, run_id)
+    if run is None:
+        return None
+    if run.status != "completed":
+        raise ValueError("Only completed runs can be evaluated")
+
+    actual_join = (
+        (ProductForecast.store_id == SalesHistory.store_id)
+        & (ProductForecast.product_id == SalesHistory.product_id)
+        & (ProductForecast.forecast_date == SalesHistory.sale_date)
+        & (ProductForecast.forecast_date > run.training_cutoff)
+        & (ProductForecast.forecast_date <= run.training_cutoff + timedelta(days=run.horizon_days))
+    )
+    matched = SalesHistory.id.is_not(None)
+    aggregate = session.execute(
+        select(
+            func.count(ProductForecast.id).label("total_predictions"),
+            func.count(SalesHistory.id).label("evaluated_predictions"),
+            func.coalesce(func.sum(func.coalesce(SalesHistory.units_sold, 0)), 0).label(
+                "total_actual_units"
+            ),
+            func.coalesce(
+                func.sum(case((matched, ProductForecast.predicted_units), else_=0)), 0
+            ).label("total_predicted_units"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            matched,
+                            func.abs(ProductForecast.predicted_units - SalesHistory.units_sold),
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("absolute_error_sum"),
+        )
+        .select_from(ProductForecast)
+        .outerjoin(SalesHistory, actual_join)
+        .where(ProductForecast.forecast_run_id == run_id)
+    ).one()
+    total_predictions = aggregate.total_predictions
+    evaluated = aggregate.evaluated_predictions
+    unmatched = total_predictions - evaluated
+    actual_total = int(aggregate.total_actual_units)
+    predicted_total = Decimal(aggregate.total_predicted_units)
+    error_sum = Decimal(aggregate.absolute_error_sum)
+    mae = error_sum / evaluated if evaluated else None
+    wape = (error_sum * Decimal(100) / actual_total) if evaluated and actual_total else None
+    coverage = (
+        Decimal(evaluated) * Decimal(100) / Decimal(total_predictions)
+        if total_predictions
+        else Decimal(0)
+    )
+    status = "unavailable" if not evaluated else "complete" if unmatched == 0 else "partial"
+    return run, {
+        "evaluated_predictions": evaluated,
+        "unmatched_predictions": unmatched,
+        "total_predictions": total_predictions,
+        "coverage_percent": coverage,
+        "total_actual_units": actual_total,
+        "total_predicted_units": predicted_total,
+        "mae": mae,
+        "wape_percent": wape,
+        "evaluation_status": status,
+    }
 
 
 def create_forecast(

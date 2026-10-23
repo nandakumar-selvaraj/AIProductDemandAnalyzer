@@ -10,6 +10,7 @@ def test_openapi_documents_all_implemented_endpoints_and_csv_upload() -> None:
     assert "/api/v1/ready" in paths
     assert "post" in paths["/api/v1/forecasts"]
     assert "get" in paths["/api/v1/forecasts/{run_id}/predictions"]
+    assert "post" in paths["/api/v1/forecasts/evaluate"]
     upload = paths["/api/v1/ingestion/sales"]["post"]
     assert upload["requestBody"]["content"]["multipart/form-data"]
     assert {"Health", "Data Ingestion", "Sales", "Forecasts"}.issubset(

@@ -7,12 +7,18 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.forecast import (
+    ForecastEvaluationRequest,
+    ForecastEvaluationResponse,
     ForecastPredictionsResponse,
     ForecastRequest,
     ForecastRunResponse,
 )
 from app.schemas.ingestion import ErrorResponse
-from app.services.forecast_service import create_forecast, get_forecast_predictions
+from app.services.forecast_service import (
+    create_forecast,
+    evaluate_forecast,
+    get_forecast_predictions,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/forecasts", tags=["Forecasts"])
@@ -99,4 +105,50 @@ def list_forecast_predictions(
         total_records=total,
         total_pages=ceil(total / page_size) if total else 0,
         items=predictions,
+    )
+
+
+@router.post(
+    "/evaluate",
+    response_model=ForecastEvaluationResponse,
+    summary="Evaluate a completed forecast run",
+    description=(
+        "Compares persisted predictions with actual sales on matching store, product, and "
+        "forecast dates only. Unmatched predictions are reported in coverage metadata. "
+        "WAPE is null when no predictions match or actual units sum to zero."
+    ),
+    responses={
+        404: {"model": ErrorResponse, "description": "Forecast run does not exist"},
+        409: {"model": ErrorResponse, "description": "Forecast run is not completed"},
+        422: {"description": "Invalid forecast run ID"},
+        503: {"model": ErrorResponse, "description": "Database is unavailable"},
+    },
+)
+def post_forecast_evaluation(
+    request: ForecastEvaluationRequest, session: Session = Depends(get_db)
+) -> ForecastEvaluationResponse:
+    try:
+        result = evaluate_forecast(session, request.forecast_run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "forecast_not_completed", "message": str(exc)},
+        ) from exc
+    except SQLAlchemyError as exc:
+        logger.exception("Forecast evaluation query failed")
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "database_error", "message": "Forecast evaluation is unavailable"},
+        ) from exc
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "forecast_not_found", "message": "Forecast run was not found"},
+        )
+    run, metrics = result
+    return ForecastEvaluationResponse(
+        forecast_run_id=run.id,
+        forecast_cutoff=run.training_cutoff,
+        horizon_days=run.horizon_days,
+        **metrics,
     )
