@@ -4,7 +4,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.v1.router import api_router
 from app.core.logging import configure_logging
@@ -39,6 +39,12 @@ app = FastAPI(
     ],
 )
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    """Open the interactive API documentation at the service root."""
+    return RedirectResponse(url="/docs")
 
 
 @app.exception_handler(RequestValidationError)

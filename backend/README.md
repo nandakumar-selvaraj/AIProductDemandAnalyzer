@@ -82,6 +82,26 @@ python -m uvicorn app.main:app --reload
 - Readiness: `http://127.0.0.1:8000/api/v1/ready` (checks PostgreSQL)
 - Sales upload: `POST /api/v1/ingestion/sales` with multipart field `file` (25 MiB default maximum; configure with `MAX_UPLOAD_BYTES`)
 - Sales summary: `GET /api/v1/sales/summary` returns the earliest/latest sales dates, total units sold, distinct stores and products with sales, and daily totals.
+- Forecast creation: `POST /api/v1/forecasts` with `{"horizon_days": 30}` creates a forecast run and daily predictions. `horizon_days` defaults to 30 and accepts 1–30; optional `start_date` sets the historical cutoff and cannot be after the latest sales date.
+
+Forecast baseline example response:
+
+```json
+{
+  "run_id": 1,
+  "status": "completed",
+  "forecast_cutoff": "2017-12-31",
+  "horizon_days": 30,
+  "series_processed": 1,
+  "series_excluded": 0,
+  "predictions_created": 30,
+  "created_at": "2018-01-01T00:00:00Z",
+  "started_at": "2018-01-01T00:00:00Z",
+  "completed_at": "2018-01-01T00:00:01Z"
+}
+```
+
+The baseline uses the mean units sold over the 30 calendar dates ending on the cutoff; forecasts begin the following date. A series is included only when all 30 dates have sales records. Missing records are not treated as zero, and series without a complete window are counted as excluded. This conservative policy avoids fabricating demand, but can exclude sparse or newly observed series. No seasonality, trend, uncertainty interval, or covariates are modeled. Run, predictions, and success log are committed atomically.
 
 The ingestion upload is unauthenticated for local development. Implement real authentication and authorization before exposing it to untrusted clients.
 
