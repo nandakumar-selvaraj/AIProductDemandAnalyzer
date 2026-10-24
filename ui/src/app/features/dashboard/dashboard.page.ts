@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { finalize } from 'rxjs';
 import { AlertComponent, SpinnerComponent } from '@coreui/angular';
 import { AnalyticsApiService } from '../../core/services/analytics-api.service';
 import { DashboardSummary } from '../../core/models/analytics.models';
-@Component({ selector: 'app-dashboard-page', imports: [DecimalPipe, AlertComponent, SpinnerComponent], templateUrl: './dashboard.page.html', styleUrl: './dashboard.page.scss' })
+@Component({ selector: 'app-dashboard-page', imports: [DatePipe, DecimalPipe, AlertComponent, SpinnerComponent], templateUrl: './dashboard.page.html', styleUrl: './dashboard.page.scss' })
 export class DashboardPage {
+  protected readonly chartNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 });
   private readonly api = inject(AnalyticsApiService);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
