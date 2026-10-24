@@ -1,7 +1,105 @@
-<section class="page-heading"><div><div class="eyebrow">CATALOG</div><h1>Products<span class="heading-dot">.</span></h1><p class="page-subtitle">Browse the products in your connected catalog.</p></div><span class="count-pill">{{ totalRecords() }} products</span></section>
-<section class="panel"><form class="search-row" (submit)="submitSearch($event)"><label class="search-box"><span aria-hidden="true">⌕</span><input type="search" aria-label="Search products" placeholder="Search by name or item code…" [ngModel]="search()" (ngModelChange)="search.set($event)" name="search"></label><button class="btn btn-primary" type="submit" [disabled]="loading()">Search</button></form>
-@if (error(); as message) { <c-alert color="danger" role="alert"><strong>Catalog unavailable.</strong> {{ message }} <button class="retry-link" type="button" (click)="loadProducts()">Try again</button></c-alert> }
-@if (loading()) { <div class="loading-state" role="status"><c-spinner size="sm" aria-hidden="true" /><span>Loading products…</span></div> }
-@if (!loading() && !error() && products().length === 0) { <div class="empty-state"><span class="empty-icon">◇</span><strong>No products found</strong><span>{{ search() ? 'Try a different search term.' : 'Products will appear when catalog data is available.' }}</span></div> }
-@if (!loading() && products().length > 0) { <div class="table-wrap"><table class="table align-middle"><caption class="visually-hidden">Product catalog</caption><thead><tr><th scope="col">PRODUCT</th><th scope="col">ITEM CODE</th><th scope="col">PRODUCT ID</th></tr></thead><tbody>@for (product of products(); track product.id) { <tr><td><div class="product-name"><span class="product-symbol">◇</span><strong>{{ product.name }}</strong></div></td><td><span class="code-pill">{{ product.item_code }}</span></td><td><span class="id-text">#{{ product.id }}</span></td></tr> }</tbody></table></div><div class="pagination-row"><span>Page {{ page() }} of {{ totalPages() }} · {{ totalRecords() }} products</span><div><button class="btn btn-outline-secondary" type="button" (click)="changePage(page() - 1)" [disabled]="page() <= 1">Previous</button><button class="btn btn-outline-secondary" type="button" (click)="changePage(page() + 1)" [disabled]="page() >= totalPages()">Next</button></div></div> }
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">CATALOG</div>
+    <h1>Products<span class="heading-dot">.</span></h1>
+    <p class="page-subtitle">Browse the products in your connected catalog.</p>
+  </div>
+  @if (!loading() && !error()) {
+    <span class="count-pill">{{ totalRecords() }} products</span>
+  }
+</section>
+<section class="panel" [attr.aria-busy]="loading()">
+  <form class="search-row" (submit)="submitSearch($event)">
+    <label class="search-box">
+      <span aria-hidden="true">⌕</span>
+      <input
+        type="search"
+        aria-label="Search products"
+        placeholder="Search by name or item code…"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+        name="search"
+        maxlength="100"
+      />
+    </label>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+  @if (error(); as message) {
+    <c-alert color="danger" role="alert">
+      <strong>Catalog unavailable.</strong> {{ message }}
+      <button class="retry-link" type="button" (click)="loadProducts()">Try again</button>
+    </c-alert>
+  }
+  @if (loading()) {
+    <div class="loading-state" role="status">
+      <c-spinner size="sm" aria-hidden="true" /><span>Loading products…</span>
+    </div>
+  }
+  @if (!loading() && !error() && products().length === 0) {
+    <div class="empty-state" role="status">
+      <span class="empty-icon" aria-hidden="true">◇</span><strong>No products found</strong>
+      <span>{{
+        submittedSearch()
+          ? 'Try a different search term.'
+          : 'Products will appear when catalog data is available.'
+      }}</span>
+    </div>
+  }
+  @if (!loading() && !error() && products().length > 0) {
+    <div class="table-wrap">
+      <table class="table align-middle">
+        <caption class="visually-hidden">
+          Product catalog
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">PRODUCT</th>
+            <th scope="col">ITEM CODE</th>
+            <th scope="col">PRODUCT ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (product of products(); track product.id) {
+            <tr>
+              <td>
+                <div class="product-name">
+                  <span class="product-symbol" aria-hidden="true">◇</span
+                  ><strong>{{ product.name }}</strong>
+                </div>
+              </td>
+              <td>
+                <span class="code-pill">{{ product.item_code }}</span>
+              </td>
+              <td>
+                <span class="id-text">#{{ product.id }}</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-row">
+      <span role="status"
+        >Page {{ page() }} of {{ totalPages() }} · {{ totalRecords() }} products</span
+      >
+      <nav aria-label="Product pages">
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="changePage(page() - 1)"
+          [disabled]="loading() || page() <= 1"
+        >
+          Previous
+        </button>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="changePage(page() + 1)"
+          [disabled]="loading() || page() >= totalPages()"
+        >
+          Next
+        </button>
+      </nav>
+    </div>
+  }
 </section>

@@ -41,8 +41,11 @@ Run these commands from `ui/`:
 | `npm run watch` | Rebuild development output when files change |
 | `npm test` | Run tests using the existing Angular CLI/Vitest setup |
 | `npm test -- --watch=false` | Run tests once for local verification or CI |
+| `npm run lint` | Lint TypeScript, external templates, and inline templates; warnings fail verification |
 
-No lint script is currently configured. Application TypeScript and Angular templates use strict checks during compilation. The repository CI installs UI dependencies, runs unit tests, and builds production output.
+ESLint 10, angular-eslint 22, and typescript-eslint 8 support the existing Angular 22 / TypeScript 6 toolchain. The flat configuration includes the recommended TypeScript and Angular rules and template accessibility checks. Application TypeScript and Angular templates also use strict checks during compilation. The repository CI installs UI dependencies, lints the frontend, runs unit tests, and builds production output.
+
+Component tests use Angular's HTTP testing controller to verify loading, success, empty, error, retry, search, pagination, cancellation, and teardown. Interceptor tests cover FastAPI `detail` responses, structured validation issues, the existing backend error envelope, network failures, and malformed payloads. Mobile navigation tests verify visibility state, focus handling, dismissal, and lifecycle cleanup.
 
 ## API configuration and local proxy
 
@@ -94,6 +97,7 @@ proxy.conf.json        Local API forwarding
 
 ```powershell
 npm ci
+npm run lint
 npm test -- --watch=false
 npm run build
 ```

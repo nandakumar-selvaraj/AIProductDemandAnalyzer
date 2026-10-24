@@ -70,6 +70,8 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
+      - name: Lint frontend TypeScript and templates
+        run: npm run lint
       - name: Run frontend tests
         run: npm test -- --watch=false
       - name: Build frontend

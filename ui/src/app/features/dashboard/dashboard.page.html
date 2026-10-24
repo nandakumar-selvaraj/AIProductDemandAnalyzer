@@ -1,18 +1,184 @@
-<section class="page-heading"><div><div class="eyebrow">OVERVIEW</div><h1>Good morning<span class="heading-dot">.</span></h1><p class="page-subtitle">Your demand planning workspace at a glance.</p></div><button class="btn btn-outline-secondary refresh-button" type="button" (click)="loadSummary()" [disabled]="loading()"><span aria-hidden="true">↻</span> Refresh data</button></section>
-@if (error(); as message) { <c-alert color="danger" role="alert"><strong>Dashboard unavailable.</strong> {{ message }} <button class="retry-link" type="button" (click)="loadSummary()">Try again</button></c-alert> }
-@if (loading()) { <div class="loading-state" role="status"><c-spinner size="sm" aria-hidden="true" /><span>Loading dashboard summary…</span></div> }
-@if (!loading() && summary(); as data) {
-<section class="metric-grid" aria-label="Business summary">
-<article class="metric-card"><div class="metric-top"><span class="metric-icon indigo">◇</span><span class="metric-label">PRODUCTS</span></div><div class="metric-value">{{ data.product_count | number }}</div><div class="metric-note">In your product catalog</div></article>
-<article class="metric-card"><div class="metric-top"><span class="metric-icon mint">⌂</span><span class="metric-label">STORES</span></div><div class="metric-value">{{ data.store_count | number }}</div><div class="metric-note">Across your retail network</div></article>
-<article class="metric-card"><div class="metric-top"><span class="metric-icon amber">▤</span><span class="metric-label">UNITS SOLD</span></div><div class="metric-value">{{ data.total_units_sold | number }}</div><div class="metric-note">Sales history · {{ data.historical_start_date ?? 'No data' }}{{ data.historical_end_date ? ' to ' + data.historical_end_date : '' }}</div></article>
-<article class="metric-card"><div class="metric-top"><span class="metric-icon lilac">↗</span><span class="metric-label">LATEST FORECAST</span></div><div class="metric-value forecast-value">{{ data.latest_forecast ? (data.latest_forecast.forecast_demand_total | number:'1.0-0') : '—' }}</div><div class="metric-note">{{ data.latest_forecast ? data.latest_forecast.horizon_days + '-day demand outlook' : 'No completed forecast yet' }}</div></article>
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">OVERVIEW</div>
+    <h1>Demand Overview</h1>
+    <p class="page-subtitle">Your demand planning workspace at a glance.</p>
+  </div>
+  <button
+    class="btn btn-outline-secondary refresh-button"
+    type="button"
+    (click)="loadSummary()"
+    [disabled]="loading()"
+  >
+    <span aria-hidden="true">↻</span> Refresh data
+  </button>
 </section>
-<section class="dashboard-grid"><article class="panel sales-panel"><div class="panel-heading"><div><h2>Sales overview</h2><p>Monthly units sold from recorded history</p></div><span class="live-badge"><span class="status-dot"></span>Live data</span></div>
-@if (monthlySales.length) { <div class="chart" role="img" aria-label="Monthly sales bar chart">@for (month of monthlySales; track month[0]) { <div class="chart-column"><div class="bar-value" [attr.title]="month[1] | number">{{ chartNumber.format(month[1]) }}</div><div class="bar-track"><div class="bar" [style.height.%]="(month[1] / maxMonthlySales) * 100"></div></div><span class="month-label">{{ month[0] | date:'MMM yy' }}</span></div> }</div> }
-@else { <div class="empty-state"><span class="empty-icon">▤</span><strong>No sales history yet</strong><span>Monthly sales will appear when source data is available.</span></div> }</article>
-<article class="panel forecast-panel"><div class="panel-heading"><div><h2>Forecast snapshot</h2><p>Most recent completed run</p></div><span class="forecast-icon">✳</span></div>
-@if (data.latest_forecast; as forecast) { <div class="forecast-total">{{ forecast.forecast_demand_total | number:'1.0-0' }}<span>units</span></div><div class="forecast-details"><div><span>Forecast run</span><strong>#{{ forecast.forecast_run_id }}</strong></div><div><span>Training cutoff</span><strong>{{ forecast.training_cutoff }}</strong></div><div><span>Horizon</span><strong>{{ forecast.horizon_days }} days</strong></div></div><div class="recommendation-row"><span>Demand trend signals</span><div><span class="trend-up">↑ {{ forecast.recommendation_counts['increase'] ?? 0 }}</span><span class="trend-steady">→ {{ forecast.recommendation_counts['maintain'] ?? 0 }}</span><span class="trend-down">↓ {{ forecast.recommendation_counts['reduce'] ?? 0 }}</span></div></div> }
-@else { <div class="empty-state compact"><span class="empty-icon">↗</span><strong>No forecast available</strong><span>Completed forecast runs will be summarized here.</span></div> }</article></section>
-<section class="data-note"><span aria-hidden="true">ⓘ</span><span>All figures come from the connected demand analytics API. Missing values reflect data that has not been recorded.</span></section>
+@if (error(); as message) {
+  <c-alert color="danger" role="alert"
+    ><strong>Dashboard unavailable.</strong> {{ message }}
+    <button class="retry-link" type="button" (click)="loadSummary()">Try again</button></c-alert
+  >
+}
+@if (loading()) {
+  <div class="loading-state" role="status">
+    <c-spinner size="sm" aria-hidden="true" /><span>Loading dashboard summary…</span>
+  </div>
+}
+@if (!loading() && summary(); as data) {
+  <section class="metric-grid" aria-label="Business summary">
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon indigo">◇</span><span class="metric-label">PRODUCTS</span>
+      </div>
+      <div class="metric-value">{{ data.product_count | number }}</div>
+      <div class="metric-note">In your product catalog</div>
+    </article>
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon mint">⌂</span><span class="metric-label">STORES</span>
+      </div>
+      <div class="metric-value">{{ data.store_count | number }}</div>
+      <div class="metric-note">Across your retail network</div>
+    </article>
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon amber">▤</span><span class="metric-label">UNITS SOLD</span>
+      </div>
+      <div class="metric-value">{{ data.total_units_sold | number }}</div>
+      <div class="metric-note">
+        Sales history · {{ data.historical_start_date ?? 'No data'
+        }}{{ data.historical_end_date ? ' to ' + data.historical_end_date : '' }}
+      </div>
+    </article>
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon lilac">↗</span><span class="metric-label">LATEST FORECAST</span>
+      </div>
+      <div class="metric-value forecast-value">
+        {{
+          data.latest_forecast
+            ? (data.latest_forecast.forecast_demand_total | number: '1.0-0')
+            : '—'
+        }}
+      </div>
+      <div class="metric-note">
+        {{
+          data.latest_forecast
+            ? data.latest_forecast.horizon_days + '-day demand outlook'
+            : 'No completed forecast yet'
+        }}
+      </div>
+    </article>
+  </section>
+  <section class="dashboard-grid">
+    <article class="panel sales-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Sales overview</h2>
+          <p>Monthly units sold from recorded history</p>
+        </div>
+        <span class="live-badge"><span class="status-dot"></span>Live data</span>
+      </div>
+      @if (monthlySales.length) {
+        <p id="sales-chart-description" class="visually-hidden">
+          Monthly units sold for the last {{ monthlySales.length }} recorded months. Exact values
+          follow in the monthly sales table.
+        </p>
+        <div
+          class="chart"
+          role="img"
+          aria-label="Monthly sales bar chart, units sold"
+          aria-describedby="sales-chart-description"
+        >
+          @for (month of monthlySales; track month[0]) {
+            <div class="chart-column" aria-hidden="true">
+              <div class="bar-value" [attr.title]="month[1] | number">
+                {{ chartNumber.format(month[1]) }}
+              </div>
+              <div class="bar-track">
+                <div class="bar" [style.height.%]="(month[1] / maxMonthlySales) * 100"></div>
+              </div>
+              <span class="month-label">{{ month[0] | date: 'MMM yy' }}</span>
+            </div>
+          }
+        </div>
+        <table class="visually-hidden">
+          <caption>
+            Monthly sales values
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Month</th>
+              <th scope="col">Units sold</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (month of monthlySales; track month[0]) {
+              <tr>
+                <th scope="row">{{ month[0] | date: 'MMMM yyyy' }}</th>
+                <td>{{ month[1] | number }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <div class="empty-state">
+          <span class="empty-icon">▤</span><strong>No sales history yet</strong
+          ><span>Monthly sales will appear when source data is available.</span>
+        </div>
+      }
+    </article>
+    <article class="panel forecast-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Forecast snapshot</h2>
+          <p>Most recent completed run</p>
+        </div>
+        <span class="forecast-icon">✳</span>
+      </div>
+      @if (data.latest_forecast; as forecast) {
+        <div class="forecast-total">
+          {{ forecast.forecast_demand_total | number: '1.0-0' }}<span>units</span>
+        </div>
+        <div class="forecast-details">
+          <div>
+            <span>Forecast run</span><strong>#{{ forecast.forecast_run_id }}</strong>
+          </div>
+          <div>
+            <span>Training cutoff</span><strong>{{ forecast.training_cutoff }}</strong>
+          </div>
+          <div>
+            <span>Horizon</span><strong>{{ forecast.horizon_days }} days</strong>
+          </div>
+        </div>
+        <div class="recommendation-row">
+          <span>Demand trend signals</span>
+          <div>
+            <span class="trend-up"
+              ><span class="visually-hidden">Increase:</span> ↑
+              {{ forecast.recommendation_counts['increase'] ?? 0 }}</span
+            ><span class="trend-steady"
+              ><span class="visually-hidden">Maintain:</span> →
+              {{ forecast.recommendation_counts['maintain'] ?? 0 }}</span
+            ><span class="trend-down"
+              ><span class="visually-hidden">Reduce:</span> ↓
+              {{ forecast.recommendation_counts['reduce'] ?? 0 }}</span
+            >
+          </div>
+        </div>
+      } @else {
+        <div class="empty-state compact">
+          <span class="empty-icon">↗</span><strong>No forecast available</strong
+          ><span>Completed forecast runs will be summarized here.</span>
+        </div>
+      }
+    </article>
+  </section>
+  <section class="data-note">
+    <span aria-hidden="true">ⓘ</span
+    ><span
+      >All figures come from the connected demand analytics API. Missing values reflect data that
+      has not been recorded.</span
+    >
+  </section>
 }
