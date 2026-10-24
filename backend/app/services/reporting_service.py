@@ -139,8 +139,8 @@ def dashboard_summary(session: Session):
             select(
                 predictions.c.forecast_average,
                 predictions.c.forecast_days,
-                func.coalesce(history.c.history_total, 0),
-                func.coalesce(history.c.coverage, 0),
+                func.coalesce(history.c.history_total, 0).label("history_total"),
+                func.coalesce(history.c.coverage, 0).label("coverage"),
             ).outerjoin(
                 history,
                 (history.c.store_id == predictions.c.store_id)

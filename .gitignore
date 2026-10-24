@@ -25,6 +25,19 @@ backend/data/raw/*
 ui/node_modules/
 ui/dist/
 ui/.angular/cache/
+ui/coverage/
+ui/out-tsc/
+ui/tmp/
+ui/bazel-out/
+ui/.sass-cache/
+ui/.history/
+ui/__screenshots__/
+ui/testem.log
+ui/connect.lock
+ui/libpeerconnection.log
+ui/typings/
+npm-debug.log
+yarn-error.log
 
 # Editor and OS files
 .vscode/
