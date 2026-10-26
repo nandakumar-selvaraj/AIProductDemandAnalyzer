@@ -1,0 +1,226 @@
+<div class="report-stack">
+  <section class="panel" aria-labelledby="forecast-report-heading">
+    <h2 id="forecast-report-heading">{{ title() }}</h2>
+    <app-report-run-picker [(selection)]="selected" />
+    @if (validation()) {
+      <c-alert color="danger" role="alert">{{ validation() }}</c-alert>
+    }
+    <div class="actions report-generation-actions">
+      <button type="button" class="btn btn-primary" (click)="generate()">Generate Report</button
+      ><button
+        type="button"
+        class="btn btn-outline-primary"
+        [disabled]="!canRefresh()"
+        (click)="refresh()"
+      >
+        Refresh Report
+      </button>
+    </div>
+    @if (changed()) {
+      <p class="note" role="status">
+        Run selection has changed. Results, refresh, pages and exports still use the generated run
+        below. Choose Generate Report to apply the new selection.
+      </p>
+    }
+  </section>
+  <section
+    class="panel"
+    aria-label="Forecast report results"
+    [attr.aria-busy]="state().status === 'loading'"
+  >
+    <div class="heading">
+      <div>
+        <h2>Report results</h2>
+        <p class="note">
+          Filtered API data · {{ title() }}. CSV actions appear when a report is ready.
+        </p>
+      </div>
+      @if (result(); as snapshot) {
+        @if (snapshot.report; as report) {
+          <div class="actions">
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              [disabled]="!table().rows.length || exporting()"
+              (click)="exportPage()"
+            >
+              {{ report.kind === 'evaluation' ? 'Export Evaluation CSV' : 'Export Current Page' }}
+            </button>
+            @if (report.kind !== 'evaluation') {
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="!canComplete()"
+                (click)="exportComplete()"
+                aria-describedby="complete-export-help"
+              >
+                Export Complete Report
+              </button>
+            }
+          </div>
+        }
+      }
+    </div>
+    @if (state().status === 'idle') {
+      <p role="status">Select a completed run and generate this report.</p>
+    }
+    @if (state().status === 'loading') {
+      <p role="status"><c-spinner size="sm" aria-hidden="true" /> Generating {{ title() }}…</p>
+    }
+    @if (state(); as current) {
+      @if (current.status === 'error') {
+        <c-alert color="danger" role="alert"
+          >{{ current.message }}
+          <button type="button" class="btn btn-outline-danger" (click)="refresh()">
+            Retry Report
+          </button></c-alert
+        >
+      }
+    }
+    @if (result(); as snapshot) {
+      <h3>Applied run #{{ snapshot.context.run.id }}</h3>
+      <p class="scope">
+        {{ title() }} · Generated {{ snapshot.context.generatedAt }}. All rows and exports refer to
+        this run. Predictions are estimates, not guaranteed future demand.
+      </p>
+      <details>
+        <summary>Applied run metadata</summary>
+        <app-run-overview [run]="snapshot.context.run" />
+      </details>
+      @if (snapshot.report; as report) {
+        @if (report.kind === 'evaluation') {
+          <div class="report-kpis">
+            <div>
+              MAE (units)<strong>{{ report.data.mae ?? 'N/A' }}</strong>
+            </div>
+            <div>
+              WAPE (%)<strong>{{ report.data.wape_percent ?? 'N/A' }}</strong>
+            </div>
+            <div>
+              Matching coverage (%)<strong>{{ report.data.coverage_percent }}</strong>
+            </div>
+            <div>
+              Evaluation status<strong>{{ report.data.evaluation_status }}</strong>
+            </div>
+          </div>
+          <p class="note">
+            Evaluation requires actual sales matching date, store and product. Metrics describe
+            matched observations only. Partial or unavailable coverage limits conclusions about
+            overall accuracy; N/A is not zero. Coverage measures data availability, not model
+            quality. Evaluation cutoff: {{ report.data.forecast_cutoff }} ·
+            {{ report.data.horizon_days }} days.
+          </p>
+        }
+        @if (report.kind === 'recommendations') {
+          <p class="note">
+            Demand-trend signals only, not inventory levels, purchase quantities or reorder
+            instructions. Missing history is not zero. Thresholds returned by the API: increase
+            {{ report.data.increase_threshold_percent }}% · reduce
+            {{ report.data.reduce_threshold_percent }}%. Coverage is historical days out of 30.
+          </p>
+        }
+        @if (paged(); as data) {
+          <div class="report-kpis">
+            <div>
+              API report rows<strong>{{ data.total_records }}</strong>
+            </div>
+            <div>
+              Rows on current page<strong>{{ data.items.length }}</strong>
+            </div>
+            <div>
+              Current page<strong>{{ data.page }} / {{ data.total_pages || 1 }}</strong>
+            </div>
+          </div>
+          <p class="note">
+            Current-page rows are not dataset-wide totals or aggregate demand. Product and store
+            identifiers are shown exactly as returned; no catalog names are inferred.
+          </p>
+        }
+        @if (!table().rows.length) {
+          <p class="empty" role="status">No rows are available for this report page.</p>
+        } @else {
+          <app-report-table
+            [table]="table()"
+            [caption]="
+              title() +
+              ' · applied run #' +
+              snapshot.context.run.id +
+              (report.kind === 'evaluation'
+                ? ' · single evaluation result'
+                : ' · current page only')
+            "
+          />
+        }
+        @if (paged(); as data) {
+          <nav class="pagination" aria-label="Report data pages">
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              [disabled]="data.page <= 1"
+              (click)="page(data.page - 1)"
+            >
+              Previous report page</button
+            ><span
+              >Page {{ data.page }} of {{ data.total_pages || 1 }} · {{ data.page_size }} rows per
+              server page</span
+            ><button
+              type="button"
+              class="btn btn-outline-primary"
+              [disabled]="data.page >= data.total_pages"
+              (click)="page(data.page + 1)"
+            >
+              Next report page
+            </button>
+          </nav>
+        }
+
+        @if (report.kind !== 'evaluation') {
+          <p class="note" id="complete-export-help">
+            Current Page exports only the displayed server page. Complete Report refetches every row
+            sequentially in batches of 500, up to {{ limit }} rows and 16 MiB. A download starts
+            only after every page passes count, identity and duplicate checks. Changing category,
+            generating, refreshing or paging cancels an active export. Editing the run choice alone
+            preserves this applied context.
+          </p>
+          @if (report.data.total_records > limit) {
+            <c-alert color="warning" role="status"
+              >Complete export is disabled: {{ report.data.total_records }} rows exceed the
+              {{ limit }}-row browser limit. Use Current Page or a future backend streaming export
+              API for a complete larger dataset. No rows will be silently truncated.</c-alert
+            >
+          }
+        }
+      }
+    }
+    @if (exportState(); as state) {
+      @if (state.status === 'loading') {
+        <div role="status">
+          <p>
+            Collecting complete report for applied run #{{ result()?.context?.run?.id }}:
+            {{ state.loaded }} / {{ state.total }} rows. No file downloaded yet.
+          </p>
+          <progress
+            [value]="state.loaded"
+            [max]="state.total"
+            aria-label="Complete CSV export progress"
+          ></progress
+          ><button type="button" class="btn btn-outline-danger" (click)="cancelExport()">
+            Cancel Export
+          </button>
+        </div>
+      }
+      @if (state.status === 'cancelled') {
+        <p role="status">Export cancelled. No file was downloaded.</p>
+      }
+      @if (state.status === 'success') {
+        <p role="status">{{ state.message }}</p>
+      }
+      @if (state.status === 'error') {
+        <c-alert color="danger" role="alert"
+          >{{ state.message }} No partial report was downloaded. Refresh the report or try the
+          appropriate export again.</c-alert
+        >
+      }
+    }
+  </section>
+</div>

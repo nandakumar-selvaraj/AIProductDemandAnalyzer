@@ -31,15 +31,7 @@ export const routes: Routes = [
   {
     path: 'reports',
     title: 'Reports',
-    ...placeholder({
-      title: 'Reports',
-      description: 'Prepare clear, shareable views of your demand data.',
-      messageTitle: 'Reports workspace',
-      messageBody:
-        'Reporting views are not connected yet. This page will use recorded analytics when the reporting flow is implemented.',
-      status: 'Setup in progress',
-      icon: '▤',
-    }),
+    loadComponent: () => import('./features/reports/reports.page').then((m) => m.ReportsPage),
   },
   {
     path: 'ai-assistant',

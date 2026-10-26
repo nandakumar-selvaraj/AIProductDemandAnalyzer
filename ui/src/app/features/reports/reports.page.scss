@@ -1,0 +1,117 @@
+:host {
+  display: block;
+}
+.reports-workspace {
+  padding: 1.5rem;
+  border: 1px solid #e4e8f0;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--ink);
+}
+.workspace-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+h1 {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.3rem;
+}
+.workspace-heading p {
+  color: #637088;
+  margin: 0;
+  font-size: 0.95rem;
+}
+svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.workspace-heading > svg {
+  color: #74809a;
+}
+.report-categories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.category-card {
+  display: grid;
+  position: relative;
+  gap: 0.65rem;
+  text-align: left;
+  padding: 1.1rem;
+  border: 1px solid #e2e6ee;
+  border-radius: 12px;
+  background: #fcfcfe;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.category-card:hover {
+  background: #f6f5ff;
+  border-color: #a69fe6;
+}
+.category-card.selected {
+  border-color: #7165d8;
+  background: #f5f3ff;
+  box-shadow: inset 0 0 0 1px #7165d8;
+}
+.category-card:focus-visible {
+  outline: 3px solid #8592ff;
+  outline-offset: 3px;
+}
+.category-card svg {
+  color: #7165d8;
+  width: 21px;
+  height: 21px;
+}
+.category-title {
+  font-weight: 650;
+  font-size: 1.05rem;
+}
+.category-description {
+  color: #637088;
+  font-size: 0.9rem;
+}
+.selected-label {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  color: #5547b1;
+  background: #eae6ff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.active-report {
+  margin-top: 1.4rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid #edf0f5;
+}
+@media (max-width: 600px) {
+  .reports-workspace {
+    padding: 1rem;
+  }
+  .report-categories {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .category-card {
+    transition: none;
+  }
+}

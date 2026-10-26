@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer UI
 
-Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, Demand Analysis, and Forecasts use the existing FastAPI service.
+Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, Demand Analysis, Forecasts, and Reports use the existing FastAPI service.
 
 ## Stack and prerequisites
 
@@ -68,7 +68,7 @@ Frontend environment files are public configuration; never put credentials or se
 | `/products` | API catalog with search and pagination |
 | `/demand-analysis` | Historical product/store analysis, date filters, charts, and daily observation table |
 | `/forecasts` | Create runs, browse history/predictions, evaluate actuals, review demand trends, and backtest baselines |
-| `/reports` | Placeholder |
+| `/reports` | Historical sales, forecast predictions, evaluation and demand recommendations with scoped CSV exports |
 | `/ai-assistant` | Planned; no Ollama connection or active assistant |
 
 The root URL and unknown routes redirect to Dashboard. The shell includes a responsive sidebar, page navigation, and application footer.
@@ -135,6 +135,54 @@ The lazy `ForecastsPage` composes standalone creation, history, overview, predic
 
 Forecast tests use mocked HTTP, with no database writes. Run the full verification commands above, or `npm test -- --watch=false --include="src/app/features/forecasts/**/*.spec.ts"` for feature tests. API service contracts are tested separately in `core/services/forecast-api.service.spec.ts`. Coverage includes validation, duplicate-submit guards, creation/refresh integration, selection/filter/page cancellation, teardown, exact decimals/null metrics, loading/empty/error/retry states, evaluation errors, recommendation labels/coverage, backtesting, and accessible chart/table/focus behavior.
 
+## Reports
+
+Open `/reports` and choose the **Historical Sales**, **Forecast Predictions**, **Forecast Evaluation**, or **Recommendations** card. The four keyboard-accessible cards use a two-column desktop layout, stack on mobile, and identify the selected category with text and `aria-pressed`. Applied filters and report results appear below, with CSV actions beside the results heading when data is ready. Reports is a lazy standalone feature inside the existing CoreUI shell. It reuses catalog pickers, historical charts, run metadata, API services and global error handling; it does not embed or duplicate the full Demand Analysis or Forecasts pages. `HistoricalSalesReportComponent` handles historical filters; `ForecastReportComponent` shares orchestration across the three run-based reports, with a paginated completed-run picker, typed report models/formatters and a reusable accessible report table.
+
+Choose context-specific filters and **Generate Report**. Generated results and CSV files carry an immutable copy of the applied product/store/dates or completed run, plus generation time. Editing draft filters or the selected run does not relabel an existing report or change an active export. A visible notice identifies unapplied changes. **Refresh Report** and **Retry Report** repeat the applied context (and current server page), even if the draft choice has changed. Generate applies the new choices and resets paging. Switching report category destroys its component and cancels pending data and export requests. Obsolete generations use `switchMap` cancellation; teardown uses `takeUntilDestroyed`. Loading/error states remove previous affected rows rather than presenting stale results as current.
+
+| Report | Filters and contents | CSV behavior |
+| --- | --- | --- |
+| Historical Sales | Required searchable product; optional searchable store (All Stores by default); optional ISO start/end dates; total units, observed sales dates, daily/monthly charts and tables | **Export Daily CSV** or **Export Monthly CSV** exports every corresponding observation in the returned bounded analytics response, independently of the 25-row display pages |
+| Forecast Predictions | Required completed run; applied cutoff, horizon and model metadata; exact prediction ID/date/product ID/store ID/units; server pages of 50 | Explicit **Export Current Page** and bounded **Export Complete Report** |
+| Forecast Evaluation | Required completed run; manually generated matching coverage, evaluated/unmatched counts, MAE/WAPE and matched actual/predicted totals | **Export Evaluation CSV** exports the single returned evaluation result |
+| Demand Recommendations | Required completed run; Increase/Maintain/Reduce/Insufficient Data labels, exact nullable daily averages/change, historical coverage/window, forecast horizon, reason and response thresholds; server pages of 50 | Explicit **Export Current Page** and bounded **Export Complete Report** |
+
+Historical date validation follows the existing inclusive **365-calendar-day** limit. With blank dates the backend uses up to 365 days ending on the product's latest recorded date; start-only uses up to 365 days from that start, bounded by latest history. End-only uses up to 365 days ending there. Both dates must be real ISO dates in order and within the limit. The response's start/end values identify the first/last **observed** dates, not necessarily the requested bounds; both requested and observed dates appear in the report/export. Observed sales dates count distinct dates with actual records, not calendar days. Missing dates remain gaps, never fabricated zero rows. Monthly totals cover only the selected interval, including partial edge months.
+
+Forecast reports show identifiers supplied by the prediction/recommendation APIs without speculative catalog-name lookups. Decimals are displayed/exported exactly as returned; metrics that are `null` appear as **N/A**, never zero. Evaluation requires actual sales matching date/store/product. Partial or unavailable coverage limits conclusions, and coverage is data availability rather than an accuracy score. Recommendations describe demand trends, not inventory levels, purchase quantities or reorder instructions. Prediction pages are labeled as page-scoped observations, never used to calculate dataset-wide demand totals.
+
+Reports uses only verified endpoints under the configured `/api/v1` URL:
+
+- `GET /products` and `GET /stores`: searchable/paginated catalog choices, 50 at a time.
+- `GET /products/{product_id}/analytics?store_id=...&start_date=...&end_date=...`: bounded historical sales; optional blank parameters omitted.
+- `GET /forecasts/runs?page=...&page_size=10&status=completed`: paginated completed-run choices; selection remains pinned across pages.
+- `GET /forecasts/{run_id}/predictions?page=...&page_size=...`: prediction report and export pages.
+- `POST /forecasts/evaluate` with `{ forecast_run_id }`: manual persisted-run evaluation; errors include 404/409/422/503.
+- `GET /recommendations?forecast_run_id=...&page=...&page_size=...`: recommendation report and export pages.
+
+The bounded product analytics response already contains the historical daily/monthly sales needed here. Reports does not download the unbounded global `/sales/summary` daily history. There are no invented reporting/export endpoints and no backend changes.
+
+### CSV format and download safety
+
+CSV downloads use a small reusable browser utility, with no export-library dependency. Files contain UTF-8 with a BOM, CRLF record separators, consistently ordered headers, and quoted/escaped fields, including commas, quotes, embedded line breaks and Unicode. Context is repeated as ordinary columns on every data row, making extracted rows self-describing. Context includes `report_type`, `export_scope`, generation time, product/store identifiers and names/requested and observed dates where relevant, or run ID/model/version/cutoff/horizon and recommendation thresholds. Page exports include the current page in scope and filename; complete exports use `complete_report` scope and `complete` in the filename. No partial file is described as complete.
+
+Formula-like strings beginning with `=`, `+`, `-` or `@` after whitespace/control characters are prefixed with an apostrophe; leading tab/CR/LF text is also neutralized. Strict decimal strings, including negative decimals and trailing zeros, remain unchanged. Names/reasons and context pass through the same protection as data cells. Null values serialize as `N/A`. This preserves decimal/date characters in the CSV itself; spreadsheet applications may independently coerce values when opening a CSV, so use their text-column import option when exact long-decimal display is required. Quoted fields alone do not prevent formula execution, so the text neutralization is intentional.
+
+Filenames are deterministic and descriptive, for example `predictions-run-7-cutoff-2017-12-31-horizon-30-page-2.csv` or `historical-sales-product-1-store-all-default-to-default-daily.csv`. Browser `Blob`/object URL/anchor APIs initiate the download; the temporary anchor is removed and the object URL revoked afterward. Failed download preparation has an actionable error state.
+
+### Complete-export limits and consistency
+
+Complete prediction/recommendation CSV export supports **1–20,000 rows**, fetched **sequentially in batches of 500**, the verified API maximum page size. At most one export HTTP request is active; progress reports collected/expected rows and **Cancel Export** aborts the active request and prevents later pages. The exporter refetches page one rather than treating the display page as the whole report. A fresh collection must match the generated report's total count/run identity, expected page number/size/counts and unique record keys; recommendation thresholds must also match. Changed counts, incorrect context, duplicates, missing rows or failed pages abort without downloading a file. No rows are silently dropped. Empty results have exports disabled.
+
+A **16 MiB cumulative UTF-8 JSON payload guard** limits retained source data; the final encoded CSV also has a **16 MiB size limit**, including repeated context. A large reason/context may therefore reject a report below the row limit. The implementation retains one bounded collection and constructs its CSV only after collection succeeds. Generate, Refresh, report-page navigation, category switching and component destruction cancel an active export; editing draft filters alone leaves its captured applied context intact. Failed/cancelled exports can be explicitly restarted from page one.
+
+Above 20,000 rows, Complete Report is disabled with an explanation; Current Page remains available and clearly scoped. A **future backend streaming export with snapshot/version semantics** is the recommended path for larger datasets and stronger consistency. The existing paginated API has no transactional snapshot token: matching counts and duplicate checks detect common changes, but cannot prove all recommendation values were read at one instant if source sales change during collection. Generation time identifies the request context, not a server-side immutable data version. No streaming or snapshot endpoint is claimed to exist. PDF/Excel export and AI Assistant are outside this phase.
+
+### Reports tests
+
+Run `npm run lint`, `npm test -- --watch=false`, and `npm run build` from `ui/`, as in CI. To run only report tests: `npm test -- --watch=false --include="src/app/features/reports/**/*.spec.ts"`. Reports tests mock HTTP/downloads and do not modify the database. They cover categories, filters/date limits, completed-run choices, generation/pagination, applied-context snapshots, exact/null metrics, loading/empty/error/retry states, request cancellation/teardown, chart/table labels, safe CSV encoding/formulas/Unicode, object URL cleanup, page-versus-complete semantics, export progress/cancellation/failures/consistency checks and row/memory limits. Existing forecast API tests also verify optional 500-row export batches while keeping normal defaults at 50.
+
 ## Folder structure
 
 ```text
@@ -149,6 +197,7 @@ src/
       products/        Product catalog component, template, and styles
       demand-analysis/ Historical analysis page, catalog pickers, charts, helpers, and tests
       forecasts/       Forecast workspace, run panels, form helpers, and tests
+      reports/         Scoped report generation, tables, CSV/export orchestration, and tests
     shared/            Reusable placeholder page
     app.*              Application shell, configuration, routing, and shell tests
   environments/        Development and production API configuration
@@ -168,7 +217,7 @@ npm run build
 
 Serve the generated application from `dist/ui/browser`. Configure the host to return `index.html` for application routes such as `/products`. Route `/api` to FastAPI through a same-origin reverse proxy; Angular's development proxy does not run in production. If deployment uses a separate API origin instead, update the production API URL and configure that origin on the backend.
 
-Production hosting, reverse-proxy configuration, backend startup, migrations, and data ingestion are deployment setup tasks. Reports and AI Assistant still require future UI implementation.
+Production hosting, reverse-proxy configuration, backend startup, migrations, and data ingestion are deployment setup tasks. AI Assistant still requires future UI implementation.
 
 ## CoreUI source and licensing
 

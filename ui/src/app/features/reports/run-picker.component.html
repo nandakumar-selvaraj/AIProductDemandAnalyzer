@@ -1,0 +1,66 @@
+<div [attr.aria-busy]="state().status === 'loading'">
+  <label for="report-run">Completed forecast run (required)</label>
+  <select
+    id="report-run"
+    class="form-select"
+    [ngModel]="selection()?.id ?? null"
+    (ngModelChange)="select($event)"
+    [disabled]="state().status === 'loading'"
+    aria-describedby="report-run-help"
+  >
+    <option [ngValue]="null">Select a completed run</option>
+    @if (pinned(); as run) {
+      <option [ngValue]="run.id">
+        #{{ run.id }} · {{ run.model_name }} · {{ run.training_cutoff }} (selected)
+      </option>
+    }
+    @for (run of result()?.items ?? []; track run.id) {
+      <option [ngValue]="run.id">
+        #{{ run.id }} · {{ run.model_name }} · {{ run.training_cutoff }} ·
+        {{ run.horizon_days }} days
+      </option>
+    }
+  </select>
+  <p class="note" id="report-run-help">
+    Completed runs only. Changing this selection does not change an already generated report or
+    export; choose Generate Report to apply it.
+  </p>
+  @if (state().status === 'loading') {
+    <p role="status"><c-spinner size="sm" aria-hidden="true" /> Loading completed runs…</p>
+  }
+  @if (state(); as current) {
+    @if (current.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >{{ current.message }}
+        <button type="button" class="btn btn-outline-danger" (click)="refresh()">
+          Retry completed runs
+        </button></c-alert
+      >
+    }
+  }
+  @if (result(); as data) {
+    @if (!data.items.length) {
+      <p role="status">No completed forecast runs are available on this page.</p>
+    }
+    <nav class="pagination run-choice-pagination" aria-label="Completed run selector pages">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        [disabled]="data.page <= 1"
+        (click)="page(data.page - 1)"
+      >
+        Previous run choices</button
+      ><span>Page {{ data.page }} of {{ data.total_pages || 1 }}</span
+      ><button
+        type="button"
+        class="btn btn-outline-secondary"
+        [disabled]="data.page >= data.total_pages"
+        (click)="page(data.page + 1)"
+      >
+        Next run choices</button
+      ><button type="button" class="btn btn-outline-secondary" (click)="refresh()">
+        Refresh run choices
+      </button>
+    </nav>
+  }
+</div>

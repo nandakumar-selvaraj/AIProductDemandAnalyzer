@@ -1,0 +1,193 @@
+<div class="report-stack">
+  <section class="panel" aria-labelledby="historical-report-heading">
+    <h2 id="historical-report-heading">Historical Sales Report</h2>
+    <p class="note">
+      Recorded sales only. Choose a product, an optional store and up to 365 inclusive calendar
+      days. Blank dates use the backend's bounded defaults: latest 365 days, or up to 365 days from
+      a supplied start.
+    </p>
+    <div class="two-columns filters">
+      <app-catalog-picker
+        kind="products"
+        [(selection)]="product"
+        [invalid]="errors().length > 0 && !product()"
+      /><app-catalog-picker kind="stores" [(selection)]="store" />
+    </div>
+    <form (ngSubmit)="generate()">
+      <div class="form-grid">
+        <div class="field">
+          <label for="report-start">Start date (optional)</label
+          ><input
+            id="report-start"
+            type="date"
+            class="form-control"
+            name="start"
+            [ngModel]="start()"
+            (ngModelChange)="start.set($event)"
+          />
+        </div>
+        <div class="field">
+          <label for="report-end">End date (optional)</label
+          ><input
+            id="report-end"
+            type="date"
+            class="form-control"
+            name="end"
+            [ngModel]="end()"
+            (ngModelChange)="end.set($event)"
+          />
+        </div>
+      </div>
+      @if (errors().length) {
+        <c-alert color="danger" role="alert"
+          ><ul>
+            @for (error of errors(); track error) {
+              <li>{{ error }}</li>
+            }
+          </ul></c-alert
+        >
+      }
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Generate Report</button
+        ><button
+          type="button"
+          class="btn btn-outline-primary"
+          [disabled]="!canRefresh()"
+          (click)="refresh()"
+        >
+          Refresh Report
+        </button>
+      </div>
+    </form>
+    @if (changed()) {
+      <p class="note" role="status">
+        Filters have changed. Results, refresh and exports still use the applied context below until
+        Generate Report is selected.
+      </p>
+    }
+  </section>
+  <section
+    class="panel"
+    aria-label="Historical report results"
+    [attr.aria-busy]="state().status === 'loading'"
+  >
+    <div class="heading">
+      <div>
+        <h2>Report results</h2>
+        <p class="note">
+          Filtered API data · Historical sales. CSV actions appear when a report is ready.
+        </p>
+      </div>
+      @if (result(); as snapshot) {
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="!snapshot.data.daily_sales.length"
+            (click)="exportCsv('daily')"
+          >
+            Export Daily CSV</button
+          ><button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="!snapshot.data.monthly_sales.length"
+            (click)="exportCsv('monthly')"
+          >
+            Export Monthly CSV
+          </button>
+        </div>
+      }
+    </div>
+    @if (state().status === 'idle') {
+      <p role="status">Select filters and generate a historical report.</p>
+    }
+    @if (state().status === 'loading') {
+      <p role="status"><c-spinner size="sm" aria-hidden="true" /> Generating historical report…</p>
+    }
+    @if (state(); as current) {
+      @if (current.status === 'error') {
+        <c-alert color="danger" role="alert"
+          >{{ current.message }}
+          <button type="button" class="btn btn-outline-danger" (click)="refresh()">
+            Retry Report
+          </button></c-alert
+        >
+      }
+    }
+    @if (result(); as snapshot) {
+      <p class="scope">
+        Applied product #{{ snapshot.filters.product.id }} · {{ snapshot.filters.product.name }} ·
+        {{
+          snapshot.filters.store
+            ? 'Store #' + snapshot.filters.store.id + ' · ' + snapshot.filters.store.name
+            : 'All Stores'
+        }}<br />Requested dates: {{ snapshot.filters.startDate || 'Backend default' }} to
+        {{ snapshot.filters.endDate || 'Backend default' }}<br />Observed dates:
+        {{ snapshot.data.start_date || 'N/A' }} to {{ snapshot.data.end_date || 'N/A' }} · Generated
+        {{ snapshot.generatedAt }}
+      </p>
+      <div class="report-kpis">
+        <div>
+          Total recorded units<strong>{{ snapshot.data.total_units_sold | number }}</strong>
+        </div>
+        <div>
+          Observed sales dates<strong>{{ snapshot.data.observed_dates | number }}</strong>
+        </div>
+        <div>
+          Returned monthly totals<strong>{{ snapshot.data.monthly_sales.length }}</strong>
+        </div>
+      </div>
+      <p class="note">
+        Observed sales dates count distinct dates with records, not calendar days. Missing
+        observations are not zero. Monthly totals cover these returned dates; edge months may be
+        partial.
+      </p>
+
+      @if (!snapshot.data.daily_sales.length) {
+        <p class="empty" role="status">No historical observations match the applied filters.</p>
+      } @else {
+        <app-historical-chart
+          [points]="snapshot.data.daily_sales"
+          granularity="daily"
+          chartId="report-daily"
+        />
+        <app-historical-chart
+          [points]="snapshot.data.monthly_sales"
+          granularity="monthly"
+          chartId="report-monthly"
+        />
+        <h3>Recorded daily observations</h3>
+        <app-report-table
+          [table]="dailyTable()"
+          caption="Recorded daily observations · applied product, store and dates above"
+        />
+        <nav class="pagination" aria-label="Historical observation pages">
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="page() <= 1"
+            (click)="changePage(page() - 1)"
+          >
+            Previous observations</button
+          ><span
+            >Page {{ page() }} of {{ pages() }} · 25 rows per display page; CSV contains all
+            returned observations</span
+          ><button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="page() >= pages()"
+            (click)="changePage(page() + 1)"
+          >
+            Next observations
+          </button>
+        </nav>
+      }
+    }
+    @if (downloadMessage()) {
+      <p role="status">{{ downloadMessage() }}</p>
+    }
+    @if (downloadError()) {
+      <c-alert color="danger" role="alert">{{ downloadError() }} Try the export again.</c-alert>
+    }
+  </section>
+</div>

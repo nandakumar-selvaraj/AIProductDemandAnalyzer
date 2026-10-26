@@ -100,6 +100,19 @@ describe('ForecastApiService contracts', () => {
     expect(request.request.body).toEqual({ cutoff_date: '2017-11-30', horizon_days: 7 });
     request.flush({});
   });
+  it('supports verified 500-row export batches without changing default UI page sizes', () => {
+    api.getPredictions(9, 2, 500).subscribe();
+    const predictions = http.expectOne((req) => req.url === `${base}/forecasts/9/predictions`);
+    expect(predictions.request.params.toString()).toBe('page=2&page_size=500');
+    predictions.flush({});
+    api.getRecommendations(9, 2, 500).subscribe();
+    const recommendations = http.expectOne((req) => req.url === `${base}/recommendations`);
+    expect(recommendations.request.params.get('page_size')).toBe('500');
+    expect(recommendations.request.params.get('page')).toBe('2');
+    expect(recommendations.request.params.get('forecast_run_id')).toBe('9');
+    recommendations.flush({});
+  });
+
   it('cancels an unsubscribed HTTP request', () => {
     const sub = api.getPredictions(1).subscribe();
     const request = http.expectOne((req) => req.url.endsWith('/1/predictions'));

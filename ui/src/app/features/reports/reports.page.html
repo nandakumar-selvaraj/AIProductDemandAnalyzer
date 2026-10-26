@@ -1,0 +1,49 @@
+<section class="reports-workspace" aria-labelledby="reports-heading">
+  <header class="workspace-heading">
+    <div>
+      <h1 id="reports-heading">Reports</h1>
+      <p>Demand intelligence and export workspace</p>
+    </div>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M14 2H5v20h14V7zM14 2v6h5M8 18v-4m4 4v-7m4 7v-3" />
+    </svg>
+  </header>
+  <div class="report-categories" role="group" aria-label="Report category">
+    @for (category of categories; track category.type) {
+      <button
+        type="button"
+        class="category-card"
+        [class.selected]="type() === category.type"
+        [attr.aria-pressed]="type() === category.type"
+        [attr.aria-label]="category.title"
+        aria-controls="active-report"
+        (click)="type.set(category.type)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path [attr.d]="category.icon" />
+        </svg>
+        <span class="category-title">{{ category.title }}</span>
+        <span class="category-description">{{ category.description }}</span>
+        @if (type() === category.type) {
+          <span class="selected-label">Selected</span>
+        }
+      </button>
+    }
+  </div>
+  <div id="active-report" class="active-report">
+    @switch (type()) {
+      @case ('historical') {
+        <app-historical-sales-report />
+      }
+      @case ('predictions') {
+        <app-forecast-report kind="predictions" />
+      }
+      @case ('evaluation') {
+        <app-forecast-report kind="evaluation" />
+      }
+      @case ('recommendations') {
+        <app-forecast-report kind="recommendations" />
+      }
+    }
+  </div>
+</section>

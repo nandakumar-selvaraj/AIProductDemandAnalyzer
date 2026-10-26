@@ -1,0 +1,52 @@
+@use '../forecasts/forecast-panel';
+
+.report-stack > * {
+  display: block;
+  margin-bottom: 1.25rem;
+}
+.filters {
+  margin: 1rem 0;
+}
+.run-choice-pagination {
+  justify-content: flex-start;
+  margin-bottom: 0;
+}
+.report-generation-actions {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #edf0f5;
+}
+.report-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.report-kpis > div {
+  background: #f6f7fb;
+  padding: 1rem;
+  border-radius: 10px;
+}
+.report-kpis strong {
+  display: block;
+  color: #514fb5;
+  font-size: 1.4rem;
+  overflow-wrap: anywhere;
+}
+.scope {
+  border-left: 3px solid #7165d8;
+  padding-left: 0.8rem;
+  overflow-wrap: anywhere;
+}
+progress {
+  width: min(100%, 400px);
+}
+.table th {
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #8592ff;
+  outline-offset: 2px;
+}

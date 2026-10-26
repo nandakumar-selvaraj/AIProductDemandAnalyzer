@@ -32,9 +32,9 @@ export class ForecastApiService {
   createForecast(request: ForecastRequest) {
     return this.http.post<ForecastCreated>(`${this.base}/forecasts`, request);
   }
-  getPredictions(runId: number, page = 1) {
+  getPredictions(runId: number, page = 1, pageSize = 50) {
     return this.http.get<PredictionPage>(`${this.base}/forecasts/${runId}/predictions`, {
-      params: this.pagination(page, 50),
+      params: this.pagination(page, pageSize),
     });
   }
   evaluate(runId: number) {
@@ -42,9 +42,9 @@ export class ForecastApiService {
       forecast_run_id: runId,
     });
   }
-  getRecommendations(runId: number, page = 1) {
+  getRecommendations(runId: number, page = 1, pageSize = 50) {
     return this.http.get<RecommendationPage>(`${this.base}/recommendations`, {
-      params: this.pagination(page, 50).set('forecast_run_id', runId),
+      params: this.pagination(page, pageSize).set('forecast_run_id', runId),
     });
   }
   backtest(request: BacktestRequest) {
