@@ -1,0 +1,97 @@
+<div class="picker">
+  <label [for]="controlId() + '-select'"
+    >{{ label() }}{{ kind() === 'products' ? ' (required)' : ' (optional)' }}</label
+  >
+  <div class="catalog-search">
+    <label class="visually-hidden" [for]="controlId() + '-search'">Search {{ kind() }}</label>
+    <input
+      class="form-control"
+      type="search"
+      [id]="controlId() + '-search'"
+      maxlength="100"
+      [placeholder]="'Search ' + kind() + ' by name or code'"
+      [ngModel]="search()"
+      [ngModelOptions]="{ standalone: true }"
+      (ngModelChange)="search.set($event)"
+      (keydown.enter)="searchCatalog($event)"
+    />
+    <button
+      class="btn btn-outline-secondary"
+      type="button"
+      (click)="searchCatalog()"
+      [attr.aria-label]="'Search ' + kind()"
+    >
+      Search
+    </button>
+  </div>
+  <select
+    class="form-select"
+    [id]="controlId() + '-select'"
+    [ngModel]="selection()?.id ?? null"
+    [ngModelOptions]="{ standalone: true }"
+    (ngModelChange)="select($event)"
+    [disabled]="state().status === 'loading'"
+    [required]="kind() === 'products'"
+    [attr.aria-invalid]="invalid() ? 'true' : null"
+    [attr.aria-describedby]="controlId() + '-status'"
+  >
+    <option [ngValue]="null">
+      {{ kind() === 'products' ? 'Select a product' : 'All Stores' }}
+    </option>
+    @if (pinnedSelection(); as selected) {
+      <option [ngValue]="selected.id">{{ selected.name }} · {{ selected.code }} (selected)</option>
+    }
+    @for (option of result()?.items ?? []; track option.id) {
+      <option [ngValue]="option.id">{{ option.name }} · {{ option.code }}</option>
+    }
+  </select>
+  <div [id]="controlId() + '-status'" class="catalog-status" role="status">
+    @if (state().status === 'loading') {
+      <c-spinner size="sm" aria-hidden="true" /> Loading {{ kind() }}…
+    }
+    @if (result(); as result) {
+      @if (result.total === 0) {
+        {{
+          appliedSearch() ? 'No ' + kind() + ' match this search.' : 'No ' + kind() + ' available.'
+        }}
+        @if (kind() === 'stores') {
+          All Stores remains available.
+        }
+      } @else {
+        {{ result.total }} {{ kind() }} · Page {{ page() }} of {{ result.totalPages }}
+      }
+    }
+  </div>
+  @if (state(); as state) {
+    @if (state.status === 'error') {
+      <c-alert color="danger" role="alert">
+        {{ label() }} catalog unavailable. {{ state.message }}
+        <button type="button" class="retry-link" (click)="retry()">Retry {{ kind() }}</button>
+      </c-alert>
+    }
+  }
+  @if (result(); as result) {
+    @if (result.totalPages > 1) {
+      <div class="catalog-pages" role="group" [attr.aria-label]="label() + ' catalog pages'">
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          type="button"
+          [disabled]="page() <= 1"
+          (click)="changePage(page() - 1)"
+          [attr.aria-label]="'Previous ' + label().toLowerCase() + ' page'"
+        >
+          Previous
+        </button>
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          type="button"
+          [disabled]="page() >= result.totalPages"
+          (click)="changePage(page() + 1)"
+          [attr.aria-label]="'Next ' + label().toLowerCase() + ' page'"
+        >
+          Next
+        </button>
+      </div>
+    }
+  }
+</div>

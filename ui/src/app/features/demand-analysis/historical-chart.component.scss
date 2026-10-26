@@ -1,0 +1,52 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+h2 {
+  font-size: 1.15rem;
+  font-weight: 680;
+  color: var(--ink);
+  margin: 0;
+}
+.chart-note {
+  color: #637088;
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+}
+.chart-scroll {
+  overflow-x: auto;
+}
+svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+}
+text {
+  fill: #536078;
+  font-size: 20px;
+}
+.grid-line {
+  stroke: #edf0f5;
+}
+.axis-line {
+  stroke: #aeb8cb;
+}
+.sales-bar {
+  fill: #6366d9;
+}
+details {
+  margin-top: 0.7rem;
+}
+summary {
+  font-weight: 600;
+  color: #536078;
+  cursor: pointer;
+}
+.table {
+  font-size: 0.9rem;
+  margin-top: 0.8rem;
+}
+th,
+td {
+  padding: 0.65rem;
+}

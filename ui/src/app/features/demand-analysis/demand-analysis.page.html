@@ -1,0 +1,269 @@
+<header class="page-heading">
+  <div class="eyebrow">HISTORICAL ACTUALS</div>
+  <h1>Demand Analysis</h1>
+  <p>
+    Explore recorded product sales across stores and time. These are historical actuals, not
+    forecasts.
+  </p>
+</header>
+<section class="panel filters-panel" aria-labelledby="filters-heading">
+  <h2 id="filters-heading">Analysis filters</h2>
+  @if (history(); as history) {
+    @if (history.status === 'loading') {
+      <p class="history-note" role="status">Loading overall history range…</p>
+    }
+    @if (history.status === 'success') {
+      <p class="history-note">
+        Overall catalog history:
+        @if (history.start && history.end) {
+          {{ history.start | date: 'mediumDate' }} – {{ history.end | date: 'mediumDate' }}.
+        } @else {
+          No recorded sales history available.
+        }
+        This range is global; selected-product results may differ.
+      </p>
+    }
+    @if (history.status === 'error') {
+      <c-alert color="warning" role="alert"
+        >Overall history range unavailable. {{ history.message }} You can still analyze a product.
+        <button class="retry-link" type="button" (click)="retryHistory()">
+          Retry overall history
+        </button>
+      </c-alert>
+    }
+  }
+  <form (ngSubmit)="applyFilters()" aria-describedby="date-help">
+    <div class="filter-grid">
+      <app-catalog-picker
+        kind="products"
+        [(selection)]="product"
+        [invalid]="errors().length > 0 && !product()"
+      />
+      <app-catalog-picker kind="stores" [(selection)]="store" />
+      <div class="date-field">
+        <label for="analysis-start">Start date</label
+        ><input
+          id="analysis-start"
+          class="form-control"
+          type="date"
+          name="startDate"
+          [ngModel]="startDate()"
+          (ngModelChange)="startDate.set($event)"
+          [attr.aria-invalid]="dateErrors() ? 'true' : null"
+          aria-describedby="date-help"
+        />
+      </div>
+      <div class="date-field">
+        <label for="analysis-end">End date</label
+        ><input
+          id="analysis-end"
+          class="form-control"
+          type="date"
+          name="endDate"
+          [ngModel]="endDate()"
+          (ngModelChange)="endDate.set($event)"
+          [attr.aria-invalid]="dateErrors() ? 'true' : null"
+          aria-describedby="date-help"
+        />
+      </div>
+    </div>
+    <p id="date-help" class="history-note">
+      Dates are optional. The API defaults to the selected product’s latest available history, up to
+      365 calendar days. Enter both dates for an explicit range of at most 365 days, including
+      endpoints. Start-only requests use up to 365 days from that date; end-only requests use up to
+      365 days ending on that date.
+    </p>
+    @if (errors().length) {
+      <div #filterErrors tabindex="-1" class="alert alert-danger" role="alert">
+        <strong>Check your filters.</strong>
+        <ul>
+          @for (message of errors(); track message) {
+            <li>{{ message }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <div class="filter-actions">
+      <button class="btn btn-primary" type="submit">Apply Filters</button>
+      <button class="btn btn-outline-secondary" type="button" (click)="resetFilters()">
+        Reset Filters
+      </button>
+    </div>
+  </form>
+</section>
+@if (filtersChanged()) {
+  <p class="changed-note" role="status">
+    Filters have changed. Apply Filters to update the results; displayed results use the applied
+    selection below.
+  </p>
+}
+<section
+  class="analysis-results"
+  aria-label="Historical analysis results"
+  [attr.aria-busy]="state().status === 'loading'"
+>
+  @if (state(); as state) {
+    @if (state.status === 'idle') {
+      <div class="panel empty-state" role="status">
+        <h2>Choose a product to begin</h2>
+        <p>
+          Search the catalog, select a product, then apply filters to explore its recorded sales.
+        </p>
+      </div>
+    }
+    @if (state.status === 'loading') {
+      <div class="panel loading-state" role="status">
+        <c-spinner size="sm" aria-hidden="true" /> Loading historical sales for
+        {{ state.filters.product.name }}…
+      </div>
+    }
+    @if (state.status === 'error') {
+      <c-alert color="danger" role="alert"
+        ><strong>Demand analysis unavailable for {{ state.filters.product.name }}.</strong>
+        {{ state.message }}
+        <button class="retry-link" type="button" (click)="retry()">Retry analysis</button>
+      </c-alert>
+    }
+  }
+  @if (result(); as result) {
+    <div class="applied-context">
+      <strong
+        >Applied selection: {{ result.filters.product.name }} ·
+        {{ result.filters.product.code }}</strong
+      >
+      <span>{{
+        result.filters.store
+          ? result.filters.store.name + ' · ' + result.filters.store.code
+          : 'All Stores'
+      }}</span>
+      <span
+        >Requested dates: {{ result.filters.startDate || 'automatic start' }} –
+        {{ result.filters.endDate || 'automatic end' }}</span
+      >
+    </div>
+    <div class="summary-grid" aria-label="Historical sales summary">
+      <article class="panel metric">
+        <h2>Total units sold</h2>
+        <strong>{{ result.data.total_units_sold | number }}</strong>
+        <p>Recorded actual sales</p>
+      </article>
+      <article class="panel metric">
+        <h2>Observed sales dates</h2>
+        <strong>{{ result.data.observed_dates | number }}</strong>
+        <p>Distinct dates with actual records</p>
+      </article>
+      <article class="panel metric">
+        <h2>Observed-day average</h2>
+        <strong>{{ average() === null ? '—' : (average() | number: '1.0-2') }}</strong>
+        <p>Units per observed sales date, not per calendar day</p>
+      </article>
+      <article class="panel metric range-card">
+        <h2>Recorded date range</h2>
+        @if (result.data.start_date && result.data.end_date) {
+          <strong
+            >{{ result.data.start_date | date: 'mediumDate' }} –
+            {{ result.data.end_date | date: 'mediumDate' }}</strong
+          >
+        } @else {
+          <strong>No recorded dates</strong>
+        }
+        <p>Dates present in the filtered response</p>
+      </article>
+    </div>
+    @if (result.data.daily_sales.length === 0) {
+      <div class="panel empty-state" role="status">
+        <h2>No sales for the selected filters</h2>
+        <p>
+          Try another product, store, or date range. Missing observations are not treated as zero
+          demand.
+        </p>
+      </div>
+    } @else {
+      <p class="history-note">
+        Charts include only returned records. Blank periods mean no observation was returned; they
+        do not establish zero sales.
+      </p>
+      <div class="charts-grid">
+        <article class="panel">
+          <app-historical-chart
+            chartId="daily-history"
+            granularity="daily"
+            [points]="result.data.daily_sales"
+          />
+        </article>
+        <article class="panel">
+          <app-historical-chart
+            chartId="monthly-history"
+            granularity="monthly"
+            [points]="result.data.monthly_sales"
+          />
+        </article>
+      </div>
+      <section class="panel observations" aria-labelledby="observations-heading">
+        <div class="table-heading">
+          <h2 id="observations-heading">Recorded daily observations</h2>
+          <div>
+            <label for="observation-order">Date order</label
+            ><select
+              id="observation-order"
+              class="form-select"
+              [ngModel]="newestFirst()"
+              (ngModelChange)="sortDates($event)"
+              [ngModelOptions]="{ standalone: true }"
+            >
+              <option [ngValue]="false">Oldest first</option>
+              <option [ngValue]="true">Newest first</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table align-middle">
+            <caption>
+              Exact daily totals for the applied selection. Dates without records are omitted.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" [attr.aria-sort]="newestFirst() ? 'descending' : 'ascending'">
+                  Date
+                </th>
+                <th scope="col">Units sold</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (point of visibleObservations(); track point.period) {
+                <tr>
+                  <th scope="row">{{ point.period | date: 'mediumDate' }}</th>
+                  <td>{{ point.units_sold | number }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <nav class="table-pages" aria-label="Daily observation pages">
+          <span role="status"
+            >{{ observations().length }} recorded dates · Page {{ tablePage() }} of
+            {{ tablePages() }} · up to {{ pageSize }} rows per page</span
+          >
+          <div>
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              (click)="changeTablePage(tablePage() - 1)"
+              [disabled]="tablePage() <= 1"
+            >
+              Previous dates
+            </button>
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              (click)="changeTablePage(tablePage() + 1)"
+              [disabled]="tablePage() >= tablePages()"
+            >
+              Next dates
+            </button>
+          </div>
+        </nav>
+      </section>
+    }
+  }
+</section>

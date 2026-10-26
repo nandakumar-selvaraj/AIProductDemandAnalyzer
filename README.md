@@ -23,7 +23,7 @@ The API runs at <http://127.0.0.1:8000>; interactive documentation is at <http:/
 
 ## Angular UI
 
-The UI provides a responsive CoreUI shell with Dashboard, Products, Demand Analysis, Forecasts, Reports, and AI Assistant navigation. Dashboard and Products use the existing API. The other sections are clearly marked placeholders, and the AI assistant is planned for a later phase.
+The UI provides a responsive CoreUI shell with Dashboard, Products, Demand Analysis, Forecasts, Reports, and AI Assistant navigation. Dashboard, Products, and Demand Analysis use the existing API. Demand Analysis explores historical product/store sales with date filters, charts, and recorded observations. Forecasts and Reports remain placeholders, and the AI assistant is planned for a later phase.
 
 Use Node.js 24.15 or later in the Node 24 line and npm 11. From the repository root, start the UI in another terminal:
 

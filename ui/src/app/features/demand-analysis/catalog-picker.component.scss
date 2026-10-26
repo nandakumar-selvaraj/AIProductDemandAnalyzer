@@ -1,0 +1,49 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.picker {
+  display: grid;
+  gap: 0.65rem;
+}
+label {
+  font-weight: 650;
+  color: var(--ink);
+}
+.catalog-search {
+  display: flex;
+  gap: 0.5rem;
+}
+.catalog-search input {
+  min-width: 0;
+}
+.form-control,
+.form-select,
+.btn {
+  font-size: 0.95rem;
+}
+.catalog-status {
+  min-height: 1.5rem;
+  color: #637088;
+  font-size: 0.85rem;
+}
+.catalog-status c-spinner {
+  margin-right: 0.35rem;
+}
+.catalog-pages {
+  display: flex;
+  gap: 0.5rem;
+}
+.catalog-pages .btn {
+  min-height: 40px;
+}
+.retry-link {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+}
+c-alert {
+  display: block;
+  font-size: 0.9rem;
+}

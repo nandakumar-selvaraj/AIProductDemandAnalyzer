@@ -1,0 +1,101 @@
+<h2 [id]="chartId() + '-heading'">{{ title() }}</h2>
+<p class="chart-note">
+  Historical actuals · recorded {{ granularity() === 'daily' ? 'dates' : 'months' }} only.
+  @if (granularity() === 'monthly') {
+    Totals cover the selected dates; edge months may be partial.
+  }
+</p>
+@if (bars().length) {
+  <div
+    class="chart-scroll"
+    tabindex="0"
+    role="region"
+    [attr.aria-label]="title() + ', scroll horizontally on small screens'"
+  >
+    <svg
+      viewBox="0 0 1000 290"
+      role="img"
+      [attr.aria-labelledby]="chartId() + '-title'"
+      [attr.aria-describedby]="chartId() + '-description'"
+    >
+      <title [id]="chartId() + '-title'">{{ title() }}</title>
+      <desc [id]="chartId() + '-description'">
+        {{ bars().length }} recorded {{ granularity() === 'daily' ? 'dates' : 'months' }}. Missing
+        periods are gaps, not zero sales. Zero-valued observations have a baseline marker. Exact
+        values are in the
+        {{
+          granularity() === 'daily'
+            ? 'Recorded daily observations table below'
+            : 'Exact monthly values table following this chart'
+        }}.
+      </desc>
+      <line x1="70" y1="40" x2="960" y2="40" class="grid-line" />
+      <line x1="70" y1="140" x2="960" y2="140" class="grid-line" />
+      <line x1="70" y1="240" x2="960" y2="240" class="axis-line" />
+      <text x="60" y="45" text-anchor="end">{{ maximum() | number }}</text>
+      <text x="60" y="245" text-anchor="end">0</text>
+      @for (bar of bars(); track bar.period) {
+        <rect
+          [attr.x]="bar.x"
+          [attr.y]="bar.y"
+          [attr.width]="bar.width"
+          [attr.height]="bar.height"
+          class="sales-bar"
+        >
+          <title>
+            {{ bar.period | date: (granularity() === 'monthly' ? 'MMM yyyy' : 'mediumDate') }}:
+            {{ bar.units | number }} units sold
+          </title>
+        </rect>
+        @if (bar.units === 0) {
+          <circle [attr.cx]="bar.x + bar.width / 2" cy="240" r="3" class="sales-bar">
+            <title>
+              {{ bar.period | date: (granularity() === 'monthly' ? 'MMM yyyy' : 'mediumDate') }}: 0
+              recorded units sold
+            </title>
+          </circle>
+        }
+      }
+      <text x="80" y="275">
+        {{ sorted()[0].period | date: (granularity() === 'monthly' ? 'MMM yyyy' : 'mediumDate') }}
+      </text>
+      @if (sorted().length > 1) {
+        <text x="940" y="275" text-anchor="end">
+          {{
+            sorted()[sorted().length - 1].period
+              | date: (granularity() === 'monthly' ? 'MMM yyyy' : 'mediumDate')
+          }}
+        </text>
+      }
+    </svg>
+  </div>
+  @if (granularity() === 'monthly') {
+    <details>
+      <summary>Exact monthly values</summary>
+      <table class="table table-sm">
+        <caption class="visually-hidden">
+          Monthly historical units sold
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Month</th>
+            <th scope="col">Units sold</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (point of sorted(); track point.period) {
+            <tr>
+              <th scope="row">{{ point.period | date: 'MMMM yyyy' }}</th>
+              <td>{{ point.units_sold | number }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </details>
+  }
+} @else {
+  <p role="status">
+    No recorded {{ granularity() === 'daily' ? 'daily observations' : 'monthly totals' }} for these
+    filters.
+  </p>
+}
