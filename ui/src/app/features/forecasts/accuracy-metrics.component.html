@@ -1,0 +1,63 @@
+<p>
+  Evaluation status: <strong>{{ metrics().evaluation_status }}</strong>
+</p>
+@if (metrics().evaluation_status !== 'complete') {
+  <p class="note" role="status">
+    Coverage is {{ metrics().evaluation_status }}. Error metrics describe matching observations only
+    and cannot establish overall forecast accuracy.
+  </p>
+}
+<dl class="metrics">
+  @if (metrics().total_predictions !== undefined) {
+    <div>
+      <dt>Total predictions</dt>
+      <dd>{{ metrics().total_predictions | number }}</dd>
+    </div>
+  }
+  <div>
+    <dt>Evaluated predictions</dt>
+    <dd>{{ metrics().evaluated_predictions | number }}</dd>
+  </div>
+  <div>
+    <dt>Unmatched predictions</dt>
+    <dd>{{ metrics().unmatched_predictions | number }}</dd>
+  </div>
+  <div>
+    <dt>Coverage</dt>
+    <dd>{{ exact(metrics().coverage_percent) }}%</dd>
+  </div>
+  <div>
+    <dt>MAE (units)</dt>
+    <dd>{{ exact(metrics().mae) }}</dd>
+  </div>
+  <div>
+    <dt>WAPE</dt>
+    <dd>
+      {{ metrics().wape_percent === null ? 'Unavailable' : exact(metrics().wape_percent) + '%' }}
+    </dd>
+  </div>
+  <div>
+    <dt>Matched actual units</dt>
+    <dd>{{ metrics().total_actual_units | number }}</dd>
+  </div>
+  <div>
+    <dt>Matched predicted units</dt>
+    <dd>{{ exact(metrics().total_predicted_units) }}</dd>
+  </div>
+  @if (metrics().total_series !== undefined) {
+    <div>
+      <dt>Model series</dt>
+      <dd>{{ metrics().total_series | number }}</dd>
+    </div>
+  }
+  @if (metrics().evaluated_series !== undefined) {
+    <div>
+      <dt>Evaluated series</dt>
+      <dd>{{ metrics().evaluated_series | number }}</dd>
+    </div>
+  }
+</dl>
+<p class="note">
+  Coverage measures matching data, not model quality. Unavailable metrics are not zero. Decimal
+  metrics preserve the API response precision.
+</p>

@@ -1,0 +1,107 @@
+<section
+  class="panel"
+  aria-labelledby="recommendations-heading"
+  [attr.aria-busy]="state().status === 'loading'"
+>
+  <h2 id="recommendations-heading">Demand recommendations · Run #{{ run().id }}</h2>
+  <p class="note">
+    Demand-trend signals, not purchase orders, inventory levels or guaranteed stocking quantities.
+    Missing history is not zero demand.
+  </p>
+  @if (run().status !== 'completed') {
+    <p role="status">Recommendations are available for completed runs only.</p>
+  }
+  @if (state().status === 'loading') {
+    <p role="status"><c-spinner size="sm" /> Loading recommendations…</p>
+  }
+  @if (state(); as current) {
+    @if (current.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >{{ current.message }}
+        <button type="button" class="btn btn-outline-danger" (click)="retry()">
+          Retry recommendations
+        </button></c-alert
+      >
+    }
+  }
+  @if (result(); as data) {
+    <p class="note">
+      API thresholds: increase {{ data.increase_threshold_percent }}% · reduce
+      {{ data.reduce_threshold_percent }}%
+    </p>
+    @if (!data.items.length) {
+      <p class="empty" role="status">No recommendations are available for this run.</p>
+    } @else {
+      <div
+        class="table-wrap"
+        tabindex="0"
+        role="region"
+        aria-label="Scrollable demand recommendations table"
+      >
+        <table class="table">
+          <caption>
+            Store/product demand trends with exact averages, change and historical coverage.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Product ID / Store ID</th>
+              <th scope="col">Signal</th>
+              <th scope="col">Historical daily average</th>
+              <th scope="col">Forecast daily average</th>
+              <th scope="col">Change</th>
+              <th scope="col">Coverage / horizon</th>
+              <th scope="col">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of data.items; track $index) {
+              <tr>
+                <td>{{ item.product_id }} / {{ item.store_id }}</td>
+                <td>
+                  <span class="status-chip" [class]="'status-chip ' + item.recommendation">{{
+                    labels[item.recommendation]
+                  }}</span>
+                </td>
+                <td>{{ exact(item.historical_daily_average) }}</td>
+                <td>{{ exact(item.forecast_daily_average) }}</td>
+                <td>
+                  {{
+                    item.change_percent === null ? 'Unavailable' : exact(item.change_percent) + '%'
+                  }}
+                </td>
+                <td>
+                  {{ item.historical_coverage_days }}/30 historical days<br />{{
+                    item.historical_window_start
+                  }}
+                  to {{ item.historical_window_end }}<br />{{ item.forecast_horizon_days }} forecast
+                  days
+                </td>
+                <td>{{ item.reason }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <nav class="pagination" aria-label="Recommendation pages">
+      <button
+        type="button"
+        class="btn btn-outline-primary"
+        [disabled]="data.page <= 1"
+        (click)="changePage(data.page - 1)"
+      >
+        Previous recommendations</button
+      ><span
+        >Page {{ data.page }} of {{ data.total_pages || 1 }} ·
+        {{ data.total_records }} recommendations</span
+      ><button
+        type="button"
+        class="btn btn-outline-primary"
+        [disabled]="data.page >= data.total_pages"
+        (click)="changePage(data.page + 1)"
+      >
+        Next recommendations
+      </button>
+    </nav>
+  }
+</section>

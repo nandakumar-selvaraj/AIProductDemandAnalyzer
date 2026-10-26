@@ -1,0 +1,102 @@
+<section class="panel" aria-labelledby="backtest-heading" [attr.aria-busy]="pending()">
+  <h2 id="backtest-heading">Historical Backtesting</h2>
+  <p id="backtest-help" class="note">
+    Compare the trailing-average and weekday seasonal-naive baselines using training data through a
+    historical cutoff. Actuals from the following holdout window are used afterward. This comparison
+    does not create a persisted forecast run or evaluate the selected run.
+  </p>
+  <form (ngSubmit)="submit()" aria-describedby="backtest-help">
+    <div class="form-grid">
+      <div class="field">
+        <label for="backtest-cutoff">Historical cutoff (required)</label
+        ><input
+          class="form-control"
+          id="backtest-cutoff"
+          name="cutoff"
+          type="date"
+          required
+          [ngModel]="cutoff()"
+          (ngModelChange)="cutoff.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <div class="field">
+        <label for="backtest-horizon">Holdout horizon (1–30 days)</label
+        ><input
+          class="form-control"
+          id="backtest-horizon"
+          name="horizon"
+          type="number"
+          required
+          min="1"
+          max="30"
+          step="1"
+          [ngModel]="horizon()"
+          (ngModelChange)="horizon.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+    </div>
+    @if (errors().length) {
+      <div class="alert alert-danger" role="alert">
+        <ul>
+          @for (error of errors(); track error) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="pending()">Run Backtest</button>
+    </div>
+  </form>
+  @if (state(); as state) {
+    @if (state.status === 'loading') {
+      <div class="loading" role="status">
+        <c-spinner size="sm" aria-hidden="true" />Comparing baselines against historical holdout
+        observations…
+      </div>
+    }
+    @if (state.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >Backtest unavailable. {{ state.message }} Correct the inputs or try Run Backtest
+        again.</c-alert
+      >
+    }
+    @if (state.status === 'success') {
+      <p role="status">
+        Cutoff: {{ state.data.cutoff_date | date: 'mediumDate' }} ·
+        {{ state.data.horizon_days }} days. Holdout:
+        {{ state.data.holdout_start | date: 'mediumDate' }} –
+        {{ state.data.holdout_end | date: 'mediumDate' }}.
+      </p>
+      <p class="note">
+        Holdout actuals must cover every requested date somewhere in sales history. Individual
+        series can still be unmatched; compare coverage and evaluated samples before comparing
+        errors.
+      </p>
+      <div class="comparison">
+        @for (model of models(); track model[0]) {
+          <article>
+            <h3>{{ model[0] }}</h3>
+            <app-accuracy-metrics [metrics]="model[1]" />
+          </article>
+        }
+      </div>
+      @if (!models().length) {
+        <p role="status">No baseline metrics returned.</p>
+      }
+      @if (state.data.missing_dates.length) {
+        <p>Missing holdout dates reported: {{ state.data.missing_dates.join(', ') }}</p>
+      }
+      <details>
+        <summary>Backend assumptions</summary>
+        <ul>
+          @for (assumption of state.data.assumptions; track assumption) {
+            <li>{{ assumption }}</li>
+          }
+        </ul>
+      </details>
+    }
+  }
+</section>

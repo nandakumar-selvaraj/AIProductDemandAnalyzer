@@ -1,0 +1,100 @@
+<section
+  class="panel"
+  aria-labelledby="predictions-heading"
+  [attr.aria-busy]="state().status === 'loading'"
+>
+  <h2 id="predictions-heading">Predictions · Run #{{ runId() }}</h2>
+  @if (state().status === 'loading') {
+    <p role="status"><c-spinner size="sm" /> Loading predictions…</p>
+  }
+  @if (state(); as current) {
+    @if (current.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >{{ current.message }}
+        <button type="button" class="btn btn-outline-danger" (click)="retry()">
+          Retry predictions
+        </button></c-alert
+      >
+    }
+  }
+  @if (result(); as data) {
+    @if (!data.items.length) {
+      <p class="empty" role="status">No predictions are available for this run.</p>
+    } @else {
+      <h3>Current prediction page only</h3>
+      <p class="note" id="prediction-chart-description">
+        Approximate bar heights for {{ data.items.length }} individual rows on page
+        {{ data.page }} of {{ data.total_pages }}. This is not a whole-run total or a time-series
+        aggregate. Exact values and identifiers are in the table below; row order follows the API.
+      </p>
+      <svg
+        viewBox="0 0 1000 260"
+        role="img"
+        aria-labelledby="prediction-chart-title prediction-chart-description"
+        style="width: 100%; max-height: 260px"
+      >
+        <title id="prediction-chart-title">
+          Predicted units for the current page of run #{{ runId() }}
+        </title>
+        <line x1="40" y1="230" x2="970" y2="230" stroke="currentColor" />
+        @for (bar of bars(); track bar.id) {
+          <rect
+            [attr.x]="bar.x - 5"
+            [attr.y]="bar.y"
+            width="10"
+            [attr.height]="bar.height"
+            fill="#7165d8"
+          >
+            <title>Table row {{ bar.row }}</title>
+          </rect>
+        }
+        <text x="40" y="255" fill="currentColor">0 · Rows on this page →</text>
+      </svg>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable predictions table">
+        <table class="table">
+          <caption>
+            Exact predicted units · current page only. Ordered by forecast date, store, product and
+            prediction ID.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Product ID</th>
+              <th scope="col">Store ID</th>
+              <th scope="col">Predicted units</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of data.items; track item.id) {
+              <tr>
+                <td>{{ item.forecast_date }}</td>
+                <td>{{ item.product_id }}</td>
+                <td>{{ item.store_id }}</td>
+                <td>{{ item.predicted_units }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <nav class="pagination" aria-label="Prediction pages">
+      <button
+        type="button"
+        class="btn btn-outline-primary"
+        [disabled]="data.page <= 1"
+        (click)="changePage(data.page - 1)"
+      >
+        Previous predictions</button
+      ><span
+        >Page {{ data.page }} of {{ data.total_pages || 1 }} · {{ data.total_records }} predictions</span
+      ><button
+        type="button"
+        class="btn btn-outline-primary"
+        [disabled]="data.page >= data.total_pages"
+        (click)="changePage(data.page + 1)"
+      >
+        Next predictions
+      </button>
+    </nav>
+  }
+</section>

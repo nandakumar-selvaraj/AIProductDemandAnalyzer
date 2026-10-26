@@ -26,15 +26,7 @@ export const routes: Routes = [
   {
     path: 'forecasts',
     title: 'Forecasts',
-    ...placeholder({
-      title: 'Forecasts',
-      description: 'Review forecast runs and their projected demand.',
-      messageTitle: 'Forecast workspace',
-      messageBody:
-        'Forecast creation and evaluation are not yet connected to this UI. The backend supports a 30-day maximum horizon.',
-      status: 'Setup in progress',
-      icon: '↗',
-    }),
+    loadComponent: () => import('./features/forecasts/forecasts.page').then((m) => m.ForecastsPage),
   },
   {
     path: 'reports',

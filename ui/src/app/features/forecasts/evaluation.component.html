@@ -1,0 +1,38 @@
+<section
+  class="panel"
+  aria-labelledby="evaluation-heading"
+  [attr.aria-busy]="state().status === 'loading'"
+>
+  <div class="heading">
+    <h2 id="evaluation-heading">Evaluate run #{{ run().id }}</h2>
+    <button
+      type="button"
+      class="btn btn-primary"
+      [disabled]="run().status !== 'completed' || state().status === 'loading'"
+      (click)="evaluate()"
+    >
+      {{ state().status === 'error' ? 'Retry evaluation' : 'Evaluate run' }}
+    </button>
+  </div>
+  <p class="note">
+    Matches persisted predictions against recorded actual sales by date, store and product.
+    Evaluation is manual and available for completed runs only.
+  </p>
+  @if (run().status !== 'completed') {
+    <p role="status">Complete this run before evaluating it.</p>
+  } @else if (state().status === 'idle') {
+    <p>Choose Evaluate run to retrieve the current measured coverage and errors.</p>
+  }
+  @if (state().status === 'loading') {
+    <p role="status"><c-spinner size="sm" /> Evaluating recorded predictions…</p>
+  }
+  @if (state(); as current) {
+    @if (current.status === 'error') {
+      <c-alert color="danger" role="alert">{{ current.message }}</c-alert>
+    }
+  }
+  @if (result(); as data) {
+    <p>Training cutoff: {{ data.forecast_cutoff }} · Horizon: {{ data.horizon_days }} days</p>
+    <app-accuracy-metrics [metrics]="data" />
+  }
+</section>

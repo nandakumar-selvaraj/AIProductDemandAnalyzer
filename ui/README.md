@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer UI
 
-Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, and Demand Analysis display data from the existing FastAPI service.
+Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, Demand Analysis, and Forecasts use the existing FastAPI service.
 
 ## Stack and prerequisites
 
@@ -54,7 +54,7 @@ Both environment files default to the public API path `/api/v1`:
 - `src/environments/environment.ts`: development configuration.
 - `src/environments/environment.production.ts`: production configuration, selected by the production build.
 
-`AnalyticsApiService` reads this base URL and calls the existing dashboard, product/store catalogs, product analytics, and sales summary endpoints. API response types live in `core/models/`, and a shared HTTP interceptor handles backend error messages and connection failures.
+`AnalyticsApiService` reads this base URL and calls the existing dashboard, product/store catalogs, product analytics, and sales summary endpoints. `ForecastApiService` uses the same configuration for forecast runs, predictions, evaluation, recommendations, and backtesting. API response types live in `core/models/`, and a shared HTTP interceptor handles backend error messages and connection failures.
 
 For development, `angular.json` loads `proxy.conf.json`. Requests from the browser to `http://localhost:4200/api/...` are forwarded to `http://127.0.0.1:8000/api/...`, keeping browser requests on the UI origin. If the backend uses another host or port, update the proxy target. Stop and restart `npm start` after changing proxy configuration.
 
@@ -67,7 +67,7 @@ Frontend environment files are public configuration; never put credentials or se
 | `/dashboard` | API summary, historical monthly sales, and latest completed forecast |
 | `/products` | API catalog with search and pagination |
 | `/demand-analysis` | Historical product/store analysis, date filters, charts, and daily observation table |
-| `/forecasts` | Placeholder; backend forecasting supports up to 30 days |
+| `/forecasts` | Create runs, browse history/predictions, evaluate actuals, review demand trends, and backtest baselines |
 | `/reports` | Placeholder |
 | `/ai-assistant` | Planned; no Ollama connection or active assistant |
 
@@ -103,6 +103,38 @@ The page handles empty catalogs/search results, unavailable services, product-no
 
 Demand Analysis tests use the existing Angular/Vitest runner and mocked HTTP requests. Run `npm test -- --watch=false` for the full suite, or `npm test -- --watch=false --include="src/app/features/demand-analysis/**/*.spec.ts"` for feature tests. Additional API contract tests live in `core/services/analytics-api.service.spec.ts`. Coverage includes catalog loading/search/selection/paging, validation/reset, HTTP parameters, data transformations and averages, empty/error/retry states, cancellation/teardown, accessible chart markup, and table paging for a full year of observations.
 
+## Forecasts
+
+Open `/forecasts` for the latest completed run and its recorded model/version, cutoff, horizon, status, timestamps, and counts. Missing metadata is labeled **Not recorded**, rather than replaced with zero. **View Details** selects a history run and moves keyboard focus to its details heading. **Back to run history** returns focus to the history heading. History filters and pages preserve the selection; selecting another run cancels obsolete detail requests and resets detail pagination.
+
+**Create Forecast** defaults to 30 days and accepts whole-number horizons from 1 through 30. The optional training cutoff is sent as `start_date`; it is not the first prediction date. Blank cutoff sends `null`, allowing the backend to use its latest sales date. The backend computes and saves the run synchronously before responding. The UI disables duplicate submissions while pending, reports the actual returned run ID/status/counts, selects that run, resets history to All/page one, and refreshes the latest overview. The creation response does not contain model metadata; that metadata is shown only when returned by a subsequent run query.
+
+The API provides no live progress stream or creation idempotency key. A browser disconnect or navigation cancellation cannot undo work already received by the server. Check history before resubmitting after an interrupted connection. A failed refresh has its own error/retry state and does not invalidate a successful creation response.
+
+Run history uses server pages of 10 with All, Pending, Running, Completed, and Failed filters. Predictions and recommendations use server pages of 50, avoiding rendering an entire 15,000-row forecast. Prediction rows identify dates, product IDs and store IDs without inventing catalog names. Decimal strings retain API precision in tables and metrics. The accessible prediction chart approximates individual rows on the **current page only**, with exact values in the table; it is neither a whole-run aggregate nor a continuous time series.
+
+**Evaluate run** manually evaluates a completed persisted run against matching recorded actuals. Total/evaluated/unmatched predictions, coverage, MAE, WAPE, matched actual/predicted totals and evaluation status are displayed as returned. Partial/unavailable coverage is identified explicitly: matching observations alone do not establish overall forecast accuracy. Null MAE/WAPE are unavailable, not zero, and coverage is a data-matching measure rather than a quality score.
+
+Completed runs also show **Demand recommendations** with Increase, Maintain, Reduce, and Insufficient data labels. Rows include exact nullable historical/forecast daily averages and change, coverage days/window, forecast horizon, and the backend's reason. Thresholds come from the response. These are demand trends, not inventory levels, purchase orders or guaranteed stocking quantities. Missing history is never treated as zero demand.
+
+**Historical Backtesting** is separate from selected-run evaluation. Enter a required historical cutoff and a 1–30-day holdout horizon to compare the backend's trailing-average and weekday seasonal-naive baselines. The response supplies model metrics, holdout bounds, assumptions and any reported missing dates. It does not create a persisted run. Training uses data through the cutoff; subsequent holdout actuals are used for evaluation. The current backend requires sales somewhere on every requested holdout date and can still report unmatched individual series. Compare coverage and sample counts alongside errors; unavailable metrics cannot establish a winning model.
+
+Verified API dependencies, prefixed by the configured `/api/v1` base URL:
+
+| Endpoint | Contract used |
+| --- | --- |
+| `GET /forecasts/latest` | Latest completed run or `null` |
+| `GET /forecasts/runs?page=...&page_size=10&status=...` | Server history; blank All status omitted |
+| `POST /forecasts` | `{ horizon_days, start_date: date-or-null }`; synchronous creation response |
+| `GET /forecasts/{run_id}/predictions?page=...&page_size=50` | Selected run's prediction rows |
+| `POST /forecasts/evaluate` | `{ forecast_run_id }`; measured coverage and errors |
+| `GET /recommendations?forecast_run_id=...&page=...&page_size=50` | Selected completed run's demand trends |
+| `POST /forecasts/backtest` | `{ cutoff_date, horizon_days }`; nonpersisted baseline comparison |
+
+The lazy `ForecastsPage` composes standalone creation, history, overview, predictions, evaluation, recommendations and backtesting components. Signals hold local UI state; `switchMap` cancels obsolete GET/detail requests, `exhaustMap` guards POST submissions, and `takeUntilDestroyed` cleans up active subscriptions. Loading and errors remove previous results from the affected panel. All panels reuse the global API error interceptor and CoreUI alerts/spinners within the existing application shell. Tables provide captions, column headers and keyboard-focusable horizontal scroll regions on narrow screens. Completed-only actions are disabled or explained for other statuses.
+
+Forecast tests use mocked HTTP, with no database writes. Run the full verification commands above, or `npm test -- --watch=false --include="src/app/features/forecasts/**/*.spec.ts"` for feature tests. API service contracts are tested separately in `core/services/forecast-api.service.spec.ts`. Coverage includes validation, duplicate-submit guards, creation/refresh integration, selection/filter/page cancellation, teardown, exact decimals/null metrics, loading/empty/error/retry states, evaluation errors, recommendation labels/coverage, backtesting, and accessible chart/table/focus behavior.
+
 ## Folder structure
 
 ```text
@@ -116,6 +148,7 @@ src/
       dashboard/       Dashboard component, template, and styles
       products/        Product catalog component, template, and styles
       demand-analysis/ Historical analysis page, catalog pickers, charts, helpers, and tests
+      forecasts/       Forecast workspace, run panels, form helpers, and tests
     shared/            Reusable placeholder page
     app.*              Application shell, configuration, routing, and shell tests
   environments/        Development and production API configuration
@@ -135,7 +168,7 @@ npm run build
 
 Serve the generated application from `dist/ui/browser`. Configure the host to return `index.html` for application routes such as `/products`. Route `/api` to FastAPI through a same-origin reverse proxy; Angular's development proxy does not run in production. If deployment uses a separate API origin instead, update the production API URL and configure that origin on the backend.
 
-Production hosting, reverse-proxy configuration, backend startup, migrations, and data ingestion are deployment setup tasks. Forecasts, Reports, and AI Assistant still require future UI implementation.
+Production hosting, reverse-proxy configuration, backend startup, migrations, and data ingestion are deployment setup tasks. Reports and AI Assistant still require future UI implementation.
 
 ## CoreUI source and licensing
 

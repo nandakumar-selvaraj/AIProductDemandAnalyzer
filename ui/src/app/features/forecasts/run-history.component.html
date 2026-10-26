@@ -1,0 +1,127 @@
+<section
+  class="panel"
+  aria-labelledby="run-history-heading"
+  [attr.aria-busy]="state().status === 'loading'"
+>
+  <div class="heading">
+    <h2 #heading id="run-history-heading" tabindex="-1">Forecast run history</h2>
+    <button class="btn btn-outline-secondary" type="button" (click)="refresh()">
+      Refresh runs
+    </button>
+  </div>
+  <div class="filter-row">
+    <label for="run-status">Run status</label
+    ><select
+      class="form-select"
+      id="run-status"
+      [ngModel]="filter()"
+      (ngModelChange)="setFilter($event)"
+    >
+      <option value="">All</option>
+      <option value="pending">Pending</option>
+      <option value="running">Running</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+    </select>
+  </div>
+  @if (state(); as state) {
+    @if (state.status === 'loading') {
+      <div class="loading" role="status">
+        <c-spinner size="sm" aria-hidden="true" />Loading forecast runs…
+      </div>
+    }
+    @if (state.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >Run history unavailable. {{ state.message }}
+        <button class="retry" type="button" (click)="refresh()">Retry runs</button></c-alert
+      >
+    }
+  }
+  @if (result(); as result) {
+    @if (!result.items.length) {
+      <p class="empty" role="status">No forecast runs match this filter.</p>
+    } @else {
+      <div
+        class="table-wrap"
+        tabindex="0"
+        role="region"
+        aria-label="Forecast run history table, scroll horizontally if needed"
+      >
+        <table class="table">
+          <caption>
+            Newest created runs first. Times use your local timezone. Viewing another page or filter
+            does not clear the selected run.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Run</th>
+              <th scope="col">Model / version</th>
+              <th scope="col">Cutoff</th>
+              <th scope="col">Horizon</th>
+              <th scope="col">Status</th>
+              <th scope="col">Created / completed</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (run of result.items; track run.id) {
+              <tr [class.selected]="selectedId() === run.id">
+                <td>#{{ run.id }}</td>
+                <td>{{ run.model_name }} / {{ run.model_version ?? 'Not recorded' }}</td>
+                <td>{{ run.training_cutoff | date: 'mediumDate' }}</td>
+                <td>{{ run.horizon_days }} days</td>
+                <td>
+                  <span
+                    class="status-chip"
+                    [class.completed]="run.status === 'completed'"
+                    [class.failed]="run.status === 'failed'"
+                    >{{ run.status }}</span
+                  >
+                </td>
+                <td>
+                  {{ run.created_at | date: 'medium' }}<br />{{
+                    run.completed_at ? (run.completed_at | date: 'medium') : 'Not completed'
+                  }}
+                </td>
+                <td>
+                  <button
+                    class="btn btn-outline-primary"
+                    type="button"
+                    (click)="runSelected.emit(run)"
+                    [attr.aria-label]="'View details for run #' + run.id"
+                    [attr.aria-pressed]="selectedId() === run.id"
+                  >
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+    <nav class="pagination" aria-label="Forecast run pages">
+      <span role="status"
+        >{{ result.total_records }} runs · Page {{ result.page }} of
+        {{ result.total_pages || 1 }}</span
+      >
+      <div>
+        <button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="changePage(page() - 1)"
+          [disabled]="page() <= 1"
+        >
+          Previous runs</button
+        ><button
+          class="btn btn-outline-secondary"
+          type="button"
+          (click)="changePage(page() + 1)"
+          [disabled]="page() >= result.total_pages"
+        >
+          Next runs
+        </button>
+      </div>
+    </nav>
+  }
+</section>

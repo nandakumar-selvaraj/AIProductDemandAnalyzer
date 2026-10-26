@@ -1,0 +1,79 @@
+<div class="workspace">
+  <header>
+    <p class="note">DEMAND PLANNING</p>
+    <h1>Forecasts</h1>
+    <p>
+      Create and inspect recorded forecast runs, evaluate available actuals and review demand
+      trends.
+    </p>
+  </header>
+  <div class="two-columns">
+    <section
+      class="panel"
+      aria-labelledby="latest-forecast-heading"
+      [attr.aria-busy]="latestState().status === 'loading'"
+    >
+      <div class="heading">
+        <h2 id="latest-forecast-heading">Latest completed run</h2>
+        <button type="button" class="btn btn-outline-primary" (click)="refreshLatest()">
+          Refresh latest
+        </button>
+      </div>
+      @if (latestState().status === 'loading') {
+        <p role="status"><c-spinner size="sm" /> Loading latest run…</p>
+      }
+      @if (latestState(); as state) {
+        @if (state.status === 'error') {
+          <c-alert color="danger" role="alert"
+            >{{ state.message }}
+            <button type="button" class="btn btn-outline-danger" (click)="refreshLatest()">
+              Retry latest run
+            </button></c-alert
+          >
+        }
+      }
+      @if (latest(); as run) {
+        <app-run-overview [run]="run" /><button
+          type="button"
+          class="btn btn-outline-primary"
+          (click)="selectRun(run)"
+        >
+          View latest run details
+        </button>
+      } @else if (latestState().status === 'success') {
+        <p class="empty" role="status">
+          No completed forecast run is available. Create a run or inspect the history below.
+        </p>
+      }
+    </section>
+    <app-create-forecast (created)="onCreated($event)" />
+  </div>
+  <app-run-history [selectedId]="selected()?.id ?? null" (runSelected)="selectRun($event)" />
+  @if (selected(); as run) {
+    <section aria-labelledby="selected-run-heading" class="workspace">
+      <div class="panel">
+        <div class="heading">
+          <h2 #selectedHeading id="selected-run-heading" tabindex="-1">
+            Selected run #{{ run.id }}
+          </h2>
+          <button type="button" class="btn btn-outline-primary" (click)="focusHistory()">
+            Back to run history
+          </button>
+        </div>
+        <p class="note">
+          This selection remains visible when history filters or pages change. Choose View details
+          to inspect a different run.
+        </p>
+        <app-run-overview [run]="run" />
+      </div>
+      <app-forecast-predictions [runId]="run.id" />
+      <app-forecast-evaluation [run]="run" />
+      <app-forecast-recommendations [run]="run" />
+    </section>
+  } @else {
+    <p class="panel" role="status">
+      Select a run from history to see its predictions, evaluation and recommendations.
+    </p>
+  }
+  <app-backtesting />
+</div>

@@ -1,0 +1,76 @@
+<section class="panel" aria-labelledby="create-forecast-heading" [attr.aria-busy]="pending()">
+  <h2 id="create-forecast-heading">Create Forecast</h2>
+  <p id="forecast-cutoff-help" class="note">
+    Train through the optional historical cutoff date. Predictions begin the following day. With no
+    cutoff, the latest sales date is used.
+  </p>
+  <form (ngSubmit)="submit()" aria-describedby="forecast-cutoff-help">
+    <div class="form-grid">
+      <div class="field">
+        <label for="forecast-horizon">Horizon (1–30 days)</label
+        ><input
+          id="forecast-horizon"
+          class="form-control"
+          type="number"
+          name="horizon"
+          min="1"
+          max="30"
+          step="1"
+          required
+          [ngModel]="horizon()"
+          (ngModelChange)="horizon.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <div class="field">
+        <label for="forecast-cutoff">Training cutoff (optional)</label
+        ><input
+          id="forecast-cutoff"
+          class="form-control"
+          type="date"
+          name="cutoff"
+          [ngModel]="cutoff()"
+          (ngModelChange)="cutoff.set($event)"
+          [disabled]="pending()"
+          aria-describedby="forecast-cutoff-help"
+        />
+      </div>
+    </div>
+    @if (errors().length) {
+      <div class="alert alert-danger" role="alert">
+        <ul>
+          @for (error of errors(); track error) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <div class="actions">
+      <button class="btn btn-primary" type="submit" [disabled]="pending()">Create Forecast</button>
+    </div>
+  </form>
+  @if (state(); as state) {
+    @if (state.status === 'loading') {
+      <div class="loading" role="status">
+        <c-spinner size="sm" aria-hidden="true" />Submitting forecast. The server computes and saves
+        the run before responding; no live progress feed is available.
+      </div>
+    }
+    @if (state.status === 'error') {
+      <c-alert color="danger" role="alert"
+        >Forecast creation failed. {{ state.message }} Check run history before resubmitting if the
+        connection was interrupted; cancelling this page cannot undo work already received by the
+        server.</c-alert
+      >
+    }
+    @if (state.status === 'success') {
+      <c-alert color="success" role="status"
+        >Server response: run #{{ state.data.run_id }}, status {{ state.data.status }}. Refresh requested
+        for run history and the latest completed overview; check those panels for results.</c-alert
+      >
+    }
+  }
+  @if (context(); as context) {
+    <app-run-overview [run]="context" />
+  }
+</section>

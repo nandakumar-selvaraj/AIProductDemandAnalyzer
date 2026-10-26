@@ -1,0 +1,74 @@
+<dl class="metadata">
+  <div>
+    <dt>Run ID</dt>
+    <dd>#{{ run().id }}</dd>
+  </div>
+  <div>
+    <dt>Model name / version</dt>
+    <dd>
+      {{ run().model_name ?? 'Not provided in this response' }} /
+      {{ run().model_version ?? 'Not recorded' }}
+    </dd>
+  </div>
+  <div>
+    <dt>Status</dt>
+    <dd>
+      <span
+        class="status-chip"
+        [class.completed]="run().status === 'completed'"
+        [class.failed]="run().status === 'failed'"
+        >{{ run().status }}</span
+      >
+    </dd>
+  </div>
+  <div>
+    <dt>Training cutoff</dt>
+    <dd>{{ run().training_cutoff | date: 'mediumDate' }}</dd>
+  </div>
+  <div>
+    <dt>Forecast horizon</dt>
+    <dd>{{ run().horizon_days }} days</dd>
+  </div>
+  <div>
+    <dt>Series processed</dt>
+    <dd>
+      {{
+        count(run(), 'series_processed') === null
+          ? 'Not recorded'
+          : (count(run(), 'series_processed') | number)
+      }}
+    </dd>
+  </div>
+  <div>
+    <dt>Series excluded</dt>
+    <dd>
+      {{
+        count(run(), 'series_excluded') === null
+          ? 'Not recorded'
+          : (count(run(), 'series_excluded') | number)
+      }}
+    </dd>
+  </div>
+  <div>
+    <dt>Predictions created</dt>
+    <dd>
+      {{
+        count(run(), 'predictions_created') === null
+          ? 'Not recorded'
+          : (count(run(), 'predictions_created') | number)
+      }}
+    </dd>
+  </div>
+  <div>
+    <dt>Created (local time)</dt>
+    <dd>{{ run().created_at | date: 'medium' }}</dd>
+  </div>
+  <div>
+    <dt>Started (local time)</dt>
+    <dd>{{ run().started_at ? (run().started_at | date: 'medium') : 'Not recorded' }}</dd>
+  </div>
+  <div>
+    <dt>Completed (local time)</dt>
+    <dd>{{ run().completed_at ? (run().completed_at | date: 'medium') : 'Not recorded' }}</dd>
+  </div>
+</dl>
