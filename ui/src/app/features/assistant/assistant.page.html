@@ -1,0 +1,236 @@
+<div class="assistant-workspace">
+  <header class="heading">
+    <div>
+      <p class="eyebrow">BUSINESS INTELLIGENCE</p>
+      <h1>AI Business Assistant</h1>
+      <p class="note">
+        Ask questions about historical sales, demand forecasts, forecast accuracy and product
+        recommendations.
+      </p>
+    </div>
+    <button type="button" class="btn btn-outline-primary" (click)="newChat()">New Chat</button>
+  </header>
+  <div class="assistant-layout">
+    <aside class="panel" aria-label="Business question context">
+      <h2>Business context</h2>
+      <p class="note">
+        Optional filters apply to the next question. Named IDs in your question override these
+        controls. Follow-ups retain resolved context.
+      </p>
+      <label for="assistant-run">Completed forecast run (optional)</label
+      ><select
+        id="assistant-run"
+        class="form-select"
+        [ngModel]="runId()"
+        (ngModelChange)="runId.set($event)"
+        [disabled]="pending()"
+      >
+        <option [ngValue]="null">Latest completed run when needed</option>
+        @if (runId()) {
+          <option [ngValue]="runId()">Run #{{ runId() }} (current context)</option>
+        }
+        @for (run of runs()?.items ?? []; track run.id) {
+          @if (run.id !== runId()) {
+            <option [ngValue]="run.id">
+              #{{ run.id }} · {{ run.model_name }} · {{ run.training_cutoff }}
+            </option>
+          }
+        }
+      </select>
+      <p class="note">
+        Current run: {{ runId() ? '#' + runId() : 'Latest completed when needed' }}. Each answer
+        keeps its own source context.
+      </p>
+      @if (runs()?.total_records === 0) {
+        <p role="status">
+          No completed forecast run is available. Generate a forecast before asking
+          forecast-specific questions. General and historical questions remain available.
+        </p>
+      }
+      @if (runState().status === 'loading') {
+        <p role="status">Loading completed runs…</p>
+      }
+      @if (runState(); as state) {
+        @if (state.status === 'error') {
+          <c-alert color="warning" role="alert"
+            >{{ state.message }}
+            <button type="button" class="btn btn-outline-secondary" (click)="retryRuns()">
+              Retry run choices
+            </button></c-alert
+          >
+        }
+      }
+      @if (runs(); as data) {
+        <div class="pagination" aria-label="Assistant forecast run choices">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            [disabled]="data.page <= 1 || pending()"
+            (click)="runPage(data.page - 1)"
+          >
+            Previous runs</button
+          ><span>{{ data.page }} / {{ data.total_pages || 1 }}</span
+          ><button
+            type="button"
+            class="btn btn-outline-secondary"
+            [disabled]="data.page >= data.total_pages || pending()"
+            (click)="runPage(data.page + 1)"
+          >
+            Next runs
+          </button>
+        </div>
+      }
+      <div class="field">
+        <label for="assistant-product">Product ID (optional)</label
+        ><input
+          class="form-control"
+          type="number"
+          min="1"
+          step="1"
+          id="assistant-product"
+          [ngModel]="productId()"
+          (ngModelChange)="productId.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <div class="field">
+        <label for="assistant-store">Store ID (optional)</label
+        ><input
+          class="form-control"
+          type="number"
+          min="1"
+          step="1"
+          id="assistant-store"
+          [ngModel]="storeId()"
+          (ngModelChange)="storeId.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <div class="field">
+        <label for="assistant-start">Historical start (optional)</label
+        ><input
+          class="form-control"
+          type="date"
+          id="assistant-start"
+          [ngModel]="startDate()"
+          (ngModelChange)="startDate.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <div class="field">
+        <label for="assistant-end">Historical end (optional)</label
+        ><input
+          class="form-control"
+          type="date"
+          id="assistant-end"
+          [ngModel]="endDate()"
+          (ngModelChange)="endDate.set($event)"
+          [disabled]="pending()"
+        />
+      </div>
+      <p class="note">
+        History is limited to 365 inclusive days. Evaluation covers the whole run. Recommendations
+        are demand trends, not purchase quantities.
+      </p>
+    </aside>
+    <section class="panel chat" aria-labelledby="conversation-heading">
+      <h2 id="conversation-heading">Business conversation</h2>
+      @if (!messages().length) {
+        <div class="empty">
+          <h3>Start with a business question</h3>
+          <p>
+            Ask about historical product sales, persisted forecasts, demand recommendations,
+            accuracy or application rules. Answers identify their evidence scope.
+          </p>
+          <div class="starters">
+            @for (question of starters; track question) {
+              <button
+                type="button"
+                class="btn btn-outline-primary"
+                [disabled]="pending()"
+                (click)="starter(question)"
+              >
+                {{ question }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+      <div
+        class="messages"
+        #transcript
+        (scroll)="onScroll()"
+        role="log"
+        aria-label="Conversation messages"
+        aria-live="polite"
+        aria-relevant="additions"
+        [attr.aria-busy]="pending()"
+      >
+        @for (message of messages(); track message.id) {
+          <app-assistant-message [message]="message" />
+        }
+      </div>
+      @if (pending()) {
+        <p role="status">
+          <c-spinner size="sm" aria-hidden="true" /> Reviewing verified business evidence…
+          <button type="button" class="btn btn-outline-secondary" (click)="cancel()">
+            Cancel request
+          </button>
+        </p>
+      }
+      @if (state(); as state) {
+        @if (state.status === 'error') {
+          <c-alert color="danger" role="alert"
+            >{{ state.message }}
+            <button type="button" class="btn btn-outline-danger" (click)="retry()">
+              Retry answer
+            </button>
+            <p>
+              Retry repeats the original question and context. Start New Chat if the conversation
+              has expired.
+            </p></c-alert
+          >
+        }
+      }
+      @if (notice()) {
+        <p role="status">{{ notice() }}</p>
+      }
+      @if (errors().length) {
+        <c-alert color="danger" role="alert"
+          ><ul>
+            @for (error of errors(); track error) {
+              <li>{{ error }}</li>
+            }
+          </ul></c-alert
+        >
+      }
+      <form class="composer" (ngSubmit)="send()">
+        <label for="assistant-question">Your business question</label
+        ><textarea
+          id="assistant-question"
+          #composer
+          name="message"
+          class="form-control"
+          rows="3"
+          maxlength="1000"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
+          (keydown)="keydown($event)"
+          aria-describedby="assistant-input-help"
+        ></textarea>
+        <div class="composer-footer">
+          <p id="assistant-input-help" class="note">
+            Enter to send · Shift+Enter for a new line · {{ draft().length }}/1000
+          </p>
+          <button type="submit" class="btn btn-primary" [disabled]="pending() || !draft().trim()">
+            Send
+          </button>
+        </div>
+      </form>
+      <p class="note">
+        AI does not execute database queries. Only backend-verified statements are shown. Forecasts
+        are not guaranteed; missing sales are not zero. This tab's transcript is held in memory.
+      </p>
+    </section>
+  </div>
+</div>

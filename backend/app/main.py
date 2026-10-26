@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -62,6 +63,10 @@ app = FastAPI(
             "name": "Dashboard",
             "description": "Database-derived summary for the latest completed forecast.",
         },
+        {
+            "name": "Assistant",
+            "description": "Grounded business chat through a private AI provider.",
+        },
     ],
 )
 app.include_router(api_router, prefix="/api/v1")
@@ -81,7 +86,7 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
             "error": {
                 "code": "request_validation_error",
                 "message": "Request validation failed",
-                "details": exc.errors(),
+                "details": jsonable_encoder(exc.errors(), custom_encoder={ValueError: str}),
             }
         },
     )

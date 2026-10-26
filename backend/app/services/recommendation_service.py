@@ -91,6 +91,8 @@ def get_recommendations(
     page_size: int,
     increase_threshold: Decimal,
     reduce_threshold: Decimal,
+    product_id: int | None = None,
+    store_id: int | None = None,
 ) -> tuple[int, list[dict[str, object]]] | None:
     """Aggregate per-series data in SQL, then paginate and classify series."""
     run = session.get(ForecastRun, run_id)
@@ -109,6 +111,8 @@ def get_recommendations(
         )
         .where(
             ProductForecast.forecast_run_id == run_id,
+            *([ProductForecast.product_id == product_id] if product_id is not None else []),
+            *([ProductForecast.store_id == store_id] if store_id is not None else []),
             ProductForecast.forecast_date > run.training_cutoff,
             ProductForecast.forecast_date <= run.training_cutoff + timedelta(days=run.horizon_days),
         )

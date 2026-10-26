@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer UI
 
-Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, Demand Analysis, Forecasts, and Reports use the existing FastAPI service.
+Standalone Angular frontend for the AI Product Demand Analyzer, with CoreUI Free components and styles. Dashboard, Products, Demand Analysis, Forecasts, Reports, and AI Assistant use FastAPI.
 
 ## Stack and prerequisites
 
@@ -69,7 +69,7 @@ Frontend environment files are public configuration; never put credentials or se
 | `/demand-analysis` | Historical product/store analysis, date filters, charts, and daily observation table |
 | `/forecasts` | Create runs, browse history/predictions, evaluate actuals, review demand trends, and backtest baselines |
 | `/reports` | Historical sales, forecast predictions, evaluation and demand recommendations with scoped CSV exports |
-| `/ai-assistant` | Planned; no Ollama connection or active assistant |
+| `/ai-assistant` | Grounded business chat through FastAPI, with owned conversations, sources and context |
 
 The root URL and unknown routes redirect to Dashboard. The shell includes a responsive sidebar, page navigation, and application footer.
 
@@ -183,6 +183,34 @@ Above 20,000 rows, Complete Report is disabled with an explanation; Current Page
 
 Run `npm run lint`, `npm test -- --watch=false`, and `npm run build` from `ui/`, as in CI. To run only report tests: `npm test -- --watch=false --include="src/app/features/reports/**/*.spec.ts"`. Reports tests mock HTTP/downloads and do not modify the database. They cover categories, filters/date limits, completed-run choices, generation/pagination, applied-context snapshots, exact/null metrics, loading/empty/error/retry states, request cancellation/teardown, chart/table labels, safe CSV encoding/formulas/Unicode, object URL cleanup, page-versus-complete semantics, export progress/cancellation/failures/consistency checks and row/memory limits. Existing forecast API tests also verify optional 500-row export batches while keeping normal defaults at 50.
 
+## AI Business Assistant (Phase 5B)
+
+Open `/ai-assistant` in the existing CoreUI shell. The lazy standalone `AssistantPage` reuses the sidebar's active state, page title and breadcrumb. `ChatMessageComponent` handles safe message formatting, source references, warnings, timestamps and copy status; the page owns the composer, starters, context controls, scrolling and conversation orchestration. Typed contracts live in `core/models/assistant.models.ts`, and `AssistantApiService` uses the configured environment API base and global error interceptor. No new UI framework or Markdown library is introduced.
+
+The welcome screen has six business starter questions. Clicking one **submits through the same API flow as Send**, including validation and duplicate protection; no example answer is shown as live data. A question such as “highest-demand products” can produce a backend clarification about actual versus predicted demand instead of an invented ranking. The multiline composer stays sticky inside the panel: Enter sends, Shift+Enter adds a newline, and IME composition does not trigger submission. Input is limited to 1000 characters with a counter. Pending requests show an accessible status and Cancel action; Send/context edits are disabled while pending, but the composer can hold the next draft. Focus returns to the input after sending/completion/cancellation and New Chat. The transcript follows new content only when already near the bottom or after the user's own Send, preserving a deliberate scroll upward.
+
+Select a completed forecast run, or leave **Latest completed when needed**—this default is implemented by FastAPI. Run choices use the existing forecast API, completed status filtering, server pagination, loading/error/retry and explicit empty guidance. Optional product/store IDs and historical dates apply to the next question. Named IDs can override the controls on the backend; the returned resolved context updates them. Each assistant message retains its own response/source context, including its run ID, so changing runs does not relabel older evidence. Context controls are disabled during a pending answer. The UI does not independently calculate business facts, infer product/store names or call Ollama.
+
+**API contract:** `POST /api/v1/assistant/chat` with `{ message, conversation_id, context }`, plus required `X-Assistant-Session` UUID header. The context supports nullable run/product/store/start/end fields; the backend additionally supports optional `backtest_cutoff` and `backtest_horizon_days`, which can be supplied through a clearly scoped typed question (for example, “Compare backtests at 2017-11-30 for 7 days for product 10”). Responses contain `answer`, `conversation_id`, `intent`, resolved `context`, typed `sources`, `warnings`, UTC `generated_at` and `provider_used`. These fields were verified against the implemented Pydantic schemas and live OpenAPI, not an earlier proposal. Sources show only returned type, label, identifiers and dates; no unsupported deep links or fabricated citations are added.
+
+The browser communicates **only with FastAPI**. Ollama URL/model/API key remain server-side. Follow the [backend setup](../backend/README.md#ai-business-assistant--ollama--qwen3-4b) for the verified `qwen3:4b` configuration, native versus AsyncOpenAI-compatible transports and health checks. Angular's existing dev `/api` proxy forwards requests to the backend; production should use a same-origin HTTPS reverse proxy. Source/answer statements retain their grounded backend precision; the Reports/Forecasts decimal formatter does not rewrite assistant facts.
+
+Messages distinguish You/Business Assistant using text and alignment, preserve newlines and show timestamps. A small structured renderer supports paragraphs, bullet lines and `**bold**` using Angular interpolation only—no `innerHTML`, sanitizer bypass or arbitrary HTML execution. Copy response writes the original plain response text and announces success/failure. Sources and data limitations remain separate from prose. Loading, invalid question/context, missing data, unsupported/ambiguous intent, provider offline/timeout, invalid/deleted run and network errors are visible through the backend/global interceptor. The original failed question remains in the conversation. **Retry answer** repeats the original request snapshot and ownership header without adding another user bubble, even after draft filters change; Send creates a new request with current context.
+
+**Cancel request** unsubscribes the HTTP request and prevents a late answer from appending. FastAPI attempts to cancel its async inference task on disconnect, but browser cancellation does not guarantee that the inference runtime stops computing. **New Chat** cancels current browser work, clears displayed messages and conversation ID, resets **all** run/product/store/date context, rotates the random session UUID and focuses the input. The UI retains only the latest 20 messages in memory, not localStorage; reload loses the transcript. The backend retains at most ten recent messages plus explicit context with TTL/capacity bounds and no new chat tables. A session UUID is an ownership capability, not account authentication: public access to business data still requires authenticated backend authorization. One backend worker is required until shared conversation storage is added.
+
+### Local and manual testing
+
+1. Start PostgreSQL, install/start Ollama, run `ollama pull qwen3:4b`, configure the backend, and run its provider smoke script.
+2. Start FastAPI from `backend/` and `npm start` from `ui/`; open `/ai-assistant`.
+3. Ask a general starter question, then select a real completed run and ask a forecast question. Check response sources/run/date scope and limitations; no matching actual sales should produce unavailable accuracy metrics rather than fabricated accuracy.
+4. Ask a follow-up, change run context and submit again. Confirm old messages keep their original sources. Use actual catalog/persisted IDs, not assumed Kaggle numeric codes.
+5. Test Enter/Shift+Enter, keyboard focus, Copy response, long text, narrow-screen wrapping and transcript scroll behavior.
+6. Cancel a pending request, then New Chat; verify stale results do not append and all context resets. Retry an error and verify the original request is used. An expired backend conversation requires New Chat.
+7. Test backend/model unavailability only in a controlled local session; never expose Ollama's port or provider configuration to the browser.
+
+Automated tests use Angular's existing Vitest/HTTP testing controller and mocked API responses, without Ollama/PostgreSQL. Coverage includes initialization/welcome, all starter submission plumbing, manual requests/payload/header, resolved context, selected-run/source separation, rendering/warnings, loading/error/retry, cancellation/teardown/stale prevention, New Chat focus, date/ID/empty validation, Enter/Shift+Enter/IME, safe list/bold text and plain-text copying. Run `npm run lint`, `npm test -- --watch=false`, `npm run build`; feature-only: `npm test -- --watch=false --include="src/app/features/assistant/**/*.spec.ts"`. CI status must be checked separately after a push; local verification does not imply a remote workflow has run.
+
 ## Folder structure
 
 ```text
@@ -198,6 +226,7 @@ src/
       demand-analysis/ Historical analysis page, catalog pickers, charts, helpers, and tests
       forecasts/       Forecast workspace, run panels, form helpers, and tests
       reports/         Scoped report generation, tables, CSV/export orchestration, and tests
+      assistant/       Business chat page, safe message component, and interaction tests
     shared/            Reusable placeholder page
     app.*              Application shell, configuration, routing, and shell tests
   environments/        Development and production API configuration
@@ -217,7 +246,7 @@ npm run build
 
 Serve the generated application from `dist/ui/browser`. Configure the host to return `index.html` for application routes such as `/products`. Route `/api` to FastAPI through a same-origin reverse proxy; Angular's development proxy does not run in production. If deployment uses a separate API origin instead, update the production API URL and configure that origin on the backend.
 
-Production hosting, reverse-proxy configuration, backend startup, migrations, and data ingestion are deployment setup tasks. AI Assistant still requires future UI implementation.
+Production hosting, authenticated reverse-proxy configuration, backend/model startup, migrations, and data ingestion are deployment setup tasks. Provider secrets remain in backend configuration; inference and PostgreSQL endpoints must remain private.
 
 ## CoreUI source and licensing
 

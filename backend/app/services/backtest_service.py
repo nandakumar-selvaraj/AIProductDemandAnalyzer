@@ -10,7 +10,19 @@ from sqlalchemy.orm import Session
 from app.models import SalesHistory
 
 
-def run_backtest(session: Session, cutoff: date, horizon: int) -> dict[str, object]:
+def run_backtest(
+    session: Session,
+    cutoff: date,
+    horizon: int,
+    *,
+    product_id: int | None = None,
+    store_id: int | None = None,
+) -> dict[str, object]:
+    scope = []
+    if product_id is not None:
+        scope.append(SalesHistory.product_id == product_id)
+    if store_id is not None:
+        scope.append(SalesHistory.store_id == store_id)
     holdout_dates = [cutoff + timedelta(days=offset) for offset in range(1, horizon + 1)]
     history_start = cutoff - timedelta(days=29)
     train_rows = session.execute(
@@ -19,7 +31,7 @@ def run_backtest(session: Session, cutoff: date, horizon: int) -> dict[str, obje
             SalesHistory.product_id,
             SalesHistory.sale_date,
             SalesHistory.units_sold,
-        ).where(SalesHistory.sale_date.between(history_start, cutoff))
+        ).where(SalesHistory.sale_date.between(history_start, cutoff), *scope)
     ).all()
     train: dict[tuple[int, int], dict[date, int]] = defaultdict(dict)
     for store, product, day, units in train_rows:
@@ -51,7 +63,7 @@ def run_backtest(session: Session, cutoff: date, horizon: int) -> dict[str, obje
             SalesHistory.product_id,
             SalesHistory.sale_date,
             SalesHistory.units_sold,
-        ).where(SalesHistory.sale_date.in_(holdout_dates))
+        ).where(SalesHistory.sale_date.in_(holdout_dates), *scope)
     ).all()
     actuals = {(store, product, day): units for store, product, day, units in holdout_rows}
     missing_dates = sorted(set(holdout_dates) - {row[2] for row in holdout_rows})

@@ -1,0 +1,87 @@
+<article
+  [class]="'message ' + message().role"
+  [attr.aria-label]="message().role === 'user' ? 'Your question' : 'Assistant answer'"
+>
+  <header>
+    <strong>{{ message().role === 'user' ? 'You' : 'Business Assistant' }}</strong>
+    @if (message().timestamp) {
+      <time [attr.datetime]="message().timestamp">{{
+        message().timestamp | date: 'shortTime'
+      }}</time>
+    }
+  </header>
+  <div class="message-text">
+    @for (line of lines(); track $index) {
+      @if (line.bullet) {
+        <ul>
+          <li>
+            @for (part of line.parts; track $index) {
+              @if (part.bold) {
+                <strong>{{ part.text }}</strong>
+              } @else {
+                {{ part.text }}
+              }
+            }
+          </li>
+        </ul>
+      } @else {
+        <p>
+          @for (part of line.parts; track $index) {
+            @if (part.bold) {
+              <strong>{{ part.text }}</strong>
+            } @else {
+              {{ part.text }}
+            }
+          }
+        </p>
+      }
+    }
+  </div>
+  @if (message().response; as response) {
+    <p class="note">
+      {{ response.intent }} · {{ response.generated_at | date: 'medium' }} ·
+      {{ response.provider_used ? 'AI selected verified evidence' : 'Data limitation response' }}
+      @if (response.context.forecast_run_id) {
+        · Run #{{ response.context.forecast_run_id }}
+      }
+    </p>
+    @if (response.sources.length) {
+      <details>
+        <summary>Sources ({{ response.sources.length }})</summary>
+        <ul>
+          @for (source of response.sources; track source.id) {
+            <li>
+              [{{ source.id }}] {{ source.label }} · {{ source.type }}
+              @if (source.forecast_run_id) {
+                · Run #{{ source.forecast_run_id }}
+              }
+              @if (source.product_id) {
+                · Product #{{ source.product_id }}
+              }
+              @if (source.store_id) {
+                · Store #{{ source.store_id }}
+              }
+              @if (source.start_date) {
+                · {{ source.start_date }} to {{ source.end_date || 'N/A' }}
+              }
+            </li>
+          }
+        </ul>
+      </details>
+    }
+    @if (response.warnings.length) {
+      <div class="limitations">
+        <strong>Data limitations</strong>
+        <ul>
+          @for (warning of response.warnings; track warning) {
+            <li>{{ warning }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <button type="button" class="btn btn-outline-secondary" (click)="copy()">Copy response</button>
+    @if (copyStatus()) {
+      <p role="status">{{ copyStatus() }}</p>
+    }
+  }
+</article>

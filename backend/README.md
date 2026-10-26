@@ -197,6 +197,121 @@ Select the backend virtual environment with **Python: Select Interpreter**, open
 
 Swagger and ReDoc are enabled for local development. Before production deployment, review whether public documentation should remain enabled and restrict operational endpoints such as ingestion with real authentication and authorization.
 
+## AI Business Assistant — Ollama / Qwen3 4B
+
+The Assistant is a non-streaming, grounded business feature. PostgreSQL remains authoritative. Its flow is:
+
+```mermaid
+flowchart TD
+  UI[Angular Assistant] --> API[FastAPI chat endpoint]
+  API --> V[Validate question and owned conversation]
+  V --> I[Controlled intent and context resolution]
+  I --> D[Allowlisted SQLAlchemy and existing business services]
+  D --> E[Deterministic metrics and bounded evidence]
+  E --> P[Async provider interface]
+  P --> O[Private Ollama qwen3:4b]
+  O --> C[Validate evidence selection]
+  C --> A[Backend-rendered answer, sources and limitations]
+  A --> UI
+```
+
+### Verified local runtime and transport
+
+On 2026-10-26, `/api/version` returned **Ollama 0.40.11** and `/api/tags` listed **`qwen3:4b`**, a Q4_K_M model with 2,497,293,931 on-disk bytes. Both `POST /v1/chat/completions` and native `POST /api/chat` were tested, rather than assuming compatibility. See [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility), [thinking controls](https://docs.ollama.com/capabilities/thinking), and [official AsyncOpenAI usage](https://developers.openai.com/api/reference/python).
+
+The compatible endpoint returned valid visible schema-constrained JSON, but also generated reasoning despite `reasoning_effort=none`, `think=false`, and a non-thinking prompt. A short plain completion exhausted its token budget with reasoning-like content. `/api/show` advertised thinking metadata with only `true` as a value; metadata alone therefore did not establish reliable non-thinking behavior. **Native `/api/chat` with `think:false` plus the selection JSON schema returned valid visible output without a thinking field in the actual probes.** It is the verified default (`AI_OLLAMA_TRANSPORT=native`). The `openai` mode is implemented with **`AsyncOpenAI`**, an explicit timeout, `max_retries=0`, temperature and token limits; use it when compatibility is preferred and reverify thinking/output behavior for the installed model/version. Transports share the same async provider interface. There is no automatic second inference call or silent transport fallback after failure. No paid service, vector database or additional AI framework is used.
+
+### Setup and configuration
+
+Install Ollama using its [official instructions](https://docs.ollama.com/quickstart), start its local server (`ollama serve` if the desktop service is not already running), and run:
+
+```powershell
+ollama pull qwen3:4b
+ollama list
+```
+
+Keep Ollama bound to loopback locally; do not publish port 11434. From `backend/`, install the committed requirements and configure the ignored `.env`:
+
+```ini
+AI_ENABLED=true
+AI_PROVIDER=ollama
+AI_BASE_URL=http://127.0.0.1:11434/v1
+AI_MODEL=qwen3:4b
+AI_API_KEY=ollama
+AI_TIMEOUT_SECONDS=120
+AI_MAX_OUTPUT_TOKENS=512
+AI_TEMPERATURE=0.2
+AI_MAX_CONTEXT_RECORDS=100
+AI_MAX_HISTORY_MESSAGES=10
+AI_OLLAMA_TRANSPORT=native
+AI_CONTEXT_CHAR_LIMIT=8000
+AI_NUM_CTX=8192
+```
+
+The API key above is only a local placeholder; no actual credentials are required by the inspected local Ollama service. A private authenticated reverse proxy can require a real secret in this backend setting. Neither key nor provider URL/model is sent to Angular. The URL must end in `/v1`; native URLs are derived from its configured prefix, not a hardcoded host. `.env.example` leaves AI disabled until configured. Settings validate ranges, provider/transport, URL, model and credentials at startup. Restart FastAPI after changing settings; cached provider instances use the configured model without loading model weights inside the application.
+
+Additional bounds: `AI_MAX_RETRIEVAL_SERIES=1000` (100–5000), `AI_MAX_CONCURRENT_REQUESTS=1` (1–8), `AI_CONVERSATION_TTL_SECONDS=1800`, `AI_MAX_CONVERSATIONS=128`. Context records are limited to 100, recent history to ten messages, input to 1000 characters, and visible/provider JSON to 64 KiB. The context setting is conservatively enforced as UTF-8 JSON bytes; it is not a tokenizer and must be sized below the model's usable context with room for instructions/output. Oversized or truncated model responses fail safely. Timeouts are 1–300 seconds, output 32–1024 tokens and temperature 0–2. There are no automatic expensive inference retries. Provider backpressure returns `ai_busy` rather than building an unbounded queue.
+
+### API and conversation contract
+
+`POST /api/v1/assistant/chat` requires a random UUID in **`X-Assistant-Session`**. The browser creates it per chat as an in-memory ownership capability. It is **not account authentication or authorization to private business data**. The application currently shares its business dataset with trusted local clients; require authenticated principal-bound ownership/authorization before public deployment.
+
+```json
+{
+  "message": "What is the forecast for product 10?",
+  "conversation_id": null,
+  "context": {
+    "forecast_run_id": 1,
+    "product_id": 10,
+    "store_id": null,
+    "start_date": null,
+    "end_date": null
+  }
+}
+```
+
+Response fields are `answer`, generated `conversation_id`, classified `intent`, resolved `context`, `sources`, `warnings`, UTC `generated_at`, and `provider_used`. Each source has response-local ID (`f1`, etc.), `type`, label, and nullable run/product/store/date identifiers supplied by the backend. An illustrative source shape is `{ "id": "f1", "type": "forecast", "label": "Persisted prediction aggregate", "forecast_run_id": 1, "product_id": 10, "store_id": null, "start_date": "2018-01-01", "end_date": "2018-01-30" }`; these are contract examples, not claimed live metrics. OpenAPI documents the actual Pydantic schemas and required header.
+
+Omitted context fields preserve previous values; explicit null clears nullable fields. Named IDs in the question override the corresponding context. Positive bounded IDs and real ISO dates are validated; historical ranges span at most 365 inclusive days. Multiple product/store/run IDs request clarification. A phrase such as “highest-demand products” asks whether the user means historical actuals or predictions instead of guessing. `backtest_cutoff` and `backtest_horizon_days` (1–30, default 30) are additional optional context fields. A typed question such as “Compare backtests at 2017-11-30 for 7 days for product 10” resolves those controls. A backtest question without a cutoff asks for one because backtests are not persisted.
+
+The bounded TTL-based conversation store retains ten recent user/assistant messages, prior intent and resolved context, and prevents overlapping requests to one conversation. Another session cannot resume an ID. New Chat creates a new ownership capability and clears local context. No chat tables/migrations are added. Restart/expiry loses chat state. Keep one API worker; multi-worker or multi-instance deployment needs shared ownership-aware storage, TTL and distributed locking. HTTP disconnects cancel the awaiting inference task and release its slot where supported, but the separate inference server may still finish computation. Interrupted synchronous database work cannot be forcibly undone; all Assistant reads are read-only.
+
+### Supported questions and evidence
+
+- **Historical:** product trends/totals, highest historical product totals, averages per **observed** date, store comparisons and declining observed-date averages. Global rankings aggregate the complete scoped range in SQL before applying a result limit. Decline compares early/late half-window observed-date averages, excludes missing periods rather than zero-filling, and warns that coverage can differ. Defaults and the 365-day range rule match product analytics. It does not infer causal trends or forecasts from historical comparisons.
+- **Forecasts:** persisted product totals, highest predicted demand, selected-run explanations and product comparisons across stores. SQL aggregates all matching prediction rows before ranking; totals never come from one page. Dates/run/horizon and the distinction from actual sales are explicit. A request for future demand uses persisted forecasts, not current-date extrapolation or a new model run.
+- **Recommendations:** existing increase/maintain/reduce/insufficient-data classifications, their computed averages/change, reasons and historical coverage. Product/store filters apply before pagination. The existing service is read sequentially up to the retrieval-series budget; context contains at most 100 matching records, and the answer discloses inspected versus total series and selection scope. No first page is presented as a complete ranking, and no inventory/order quantity is inferred.
+- **Evaluation:** existing whole-run MAE/WAPE, matched/unmatched predictions and coverage. Product/store filters do not turn a run-level evaluation into subset accuracy. Null metrics remain explicit nulls in evidence and render as unavailable, never fabricated zero error.
+- **Backtesting:** the existing leakage-safe trailing-average/seasonal-naive calculation is reused with optional product/store input filters, with its formulas unchanged. Inputs are guarded at 50,000 rows before loading; larger scopes request narrowing, never a partial comparison. Baseline errors, evaluated samples, coverage, holdout dates and assumptions are reported separately from persisted-run evaluation. Lower error on unequal samples does not establish a winning method.
+- **General:** curated application methodology and domain explanations are labeled separately from dataset findings. The actual trailing-average baseline is not described as a sophisticated learned model.
+
+`assistant_data`/`assistant_aggregates` use only allowlisted parameterized SQLAlchemy/existing-service operations. The model receives bounded structured evidence with units, source IDs, dates and nulls; Decimal values remain strings without precision loss. All database work runs in the threadpool and its read transaction ends before async inference. The model has no SQL, database connection, filesystem/environment access or executable tools. SQL, secrets, unsupported purchase quantities and unrelated requests yield useful limitations.
+
+**Grounding boundary:** model output is restricted to evidence-ID selection under a strict schema. The backend validates IDs against supplied evidence, constructs the source list, and renders its verified natural-language statements. Arbitrary model prose/numbers/HTML are not accepted as authoritative answers. Questions, history and database text are untrusted; prompt instructions alone are not relied on as the boundary. This trades conversational flexibility for exact numerical consistency. At most eight selected facts are rendered, and warnings disclose retrieval/context truncation. Sources are never fabricated from model-generated citations.
+
+### Errors, health and testing
+
+Existing `error.code`/`error.message` envelopes are reused: disabled/unready/unavailable/busy providers and business data failures (503), timeout (504), malformed or ungrounded output (502), missing records/conversations (404), invalid contexts/context overflow (422), incomplete/busy runs/conversations (409), capacity (429), and disconnected requests (499 where still observable). Upstream bodies, paths and stack traces are not sent to the browser. Unsupported or empty usable evidence returns a limitation response without inference. Expired conversations require New Chat; manual Retry replays the original context.
+
+`/api/v1/health` checks process health, `/api/v1/ready` checks PostgreSQL, and `/api/v1/assistant/ready` checks provider/model discovery. Use the opt-in smoke script (never run automatically in CI):
+
+```powershell
+python -m scripts.assistant_smoke --both-transports
+python -m scripts.assistant_smoke --api-url http://127.0.0.1:8000/api/v1
+```
+
+The API smoke resolves real product/store IDs from persisted predictions rather than assuming IDs equal Kaggle item/store codes. It performs no writes and reports limitations if no completed run exists. Verified local runs returned nonempty sourced general, forecast, evaluation, historical and recommendation answers with follow-up context. Warm native API checks took approximately **0.37–1.12 seconds** for these selected-record questions; initial model/context load and broader questions took longer. The compatibility path returned valid JSON in roughly 4.4 seconds in a short probe but still generated reasoning. These are individual measured runs, not percentile benchmarks or throughput guarantees. Connection-refused, timeout, cancellation, malformed/empty output and context errors are tested with mocked transports; the user's Ollama service was not shut down just to simulate failure.
+
+`ollama ps` reported about **3.9 GB**, 100% GPU placement and an 8192 context on the inspected RTX 3050 (8192 MiB VRAM). `nvidia-smi` showed roughly 4945 MiB total device usage, which includes other GPU allocations, not a model-only requirement. The model file is about 2.5 GB; RAM/VRAM/KV costs depend on context, slots and hardware. Do not infer that a cheapest CPU-only VPS can meet these latencies. Benchmark representative prompts and peak memory/concurrency on the target machine before sizing.
+
+CI uses mocked providers/HTTP transports and SQLite fixtures, not Ollama/GPU or paid APIs. Standard pytest/coverage and Ruff commands below remain applicable. Backend tests cover routing/validation, source integrity, complete aggregates, null metrics, ownership/history, async transports and cancellation. Separate frontend tests mock FastAPI. Missing-model/offline problems: check `/api/tags`, `ollama ps`, configured model/URL and readiness; timeout/empty responses: check load/output/context and the verified native transport; stale chat: New Chat. Logs record only intent, source count, whether inference ran and latency, not raw questions, evidence, answers or credentials.
+
+### Cloud-portable deployment guidance — not deployed
+
+Both a **single VPS** (reverse proxy + Angular assets + FastAPI + private PostgreSQL + Ollama) and a **separate private inference host** are supported by environment configuration. Ollama has Linux/server support; follow its official installation/runtime guidance and persist model files outside ephemeral containers. `AI_BASE_URL` can point at private inference DNS over a secured network without business-code changes. Never publish Ollama or PostgreSQL to the Internet. The included non-root Python 3.13 backend Dockerfile excludes `.env`/caches and starts one worker; container build/runtime was not verified here. Run migrations as a release task, not on every worker startup. For systemd, use a restricted service account, environment file permissions, explicit working directory and separate API/Ollama units.
+
+Before public exposure: authenticated UI/API and principal-bound conversation access; private database networking and least-privilege roles; TLS reverse proxy; explicit origin allowlist if cross-origin access is needed, including `X-Assistant-Session`; body/rate/concurrency limits; reverse-proxy timeout longer than configured inference timeout; redacted logs; monitoring of readiness, request/model latency, rejection/error rates, CPU/RAM and GPU memory; persistent PostgreSQL/model volumes; scheduled encrypted database backups with restore tests. Existing shared application DB credentials also serve ingestion; a separately restricted Assistant role remains recommended. No broad CORS middleware is enabled by this feature; same-origin UI `/api` forwarding is preferred. A session UUID is not authentication. Multi-worker scaling requires shared conversation storage first. No cloud provider, paid model service or deployment is selected.
+
 ## Tests and code quality
 
 Database integration tests are opt-in and require a dedicated PostgreSQL database whose name ends in `_test`; never point tests at a normal development database. Set `TEST_DATABASE_URL` to that database URL to enable the PostgreSQL ingestion integration test. GitHub Actions provisions an isolated PostgreSQL service, applies Alembic migrations, and runs this test on every push and pull request. Unit tests use isolated fixtures and do not download data.

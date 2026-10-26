@@ -1,10 +1,5 @@
 import { Routes } from '@angular/router';
 
-const placeholder = (data: Record<string, string>) => ({
-  data,
-  loadComponent: () => import('./shared/placeholder.page').then((m) => m.PlaceholderPage),
-});
-
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
@@ -36,15 +31,7 @@ export const routes: Routes = [
   {
     path: 'ai-assistant',
     title: 'AI Assistant',
-    ...placeholder({
-      title: 'AI Assistant',
-      description: 'A future conversational workspace for demand questions.',
-      messageTitle: 'Assistant planned',
-      messageBody:
-        'The AI assistant is planned for a later phase. No model connection or assistant functionality is active.',
-      status: 'Planned',
-      icon: '✳',
-    }),
+    loadComponent: () => import('./features/assistant/assistant.page').then((m) => m.AssistantPage),
   },
   { path: '**', redirectTo: 'dashboard' },
 ];
