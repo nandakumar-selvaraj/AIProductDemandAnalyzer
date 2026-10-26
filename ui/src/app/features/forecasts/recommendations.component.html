@@ -26,8 +26,8 @@
   }
   @if (result(); as data) {
     <p class="note">
-      API thresholds: increase {{ data.increase_threshold_percent }}% · reduce
-      {{ data.reduce_threshold_percent }}%
+      API thresholds: increase {{ decimal(data.increase_threshold_percent) }}% · reduce
+      {{ decimal(data.reduce_threshold_percent) }}%
     </p>
     @if (!data.items.length) {
       <p class="empty" role="status">No recommendations are available for this run.</p>
@@ -62,11 +62,13 @@
                     labels[item.recommendation]
                   }}</span>
                 </td>
-                <td>{{ exact(item.historical_daily_average) }}</td>
-                <td>{{ exact(item.forecast_daily_average) }}</td>
+                <td>{{ decimal(item.historical_daily_average) }}</td>
+                <td>{{ decimal(item.forecast_daily_average) }}</td>
                 <td>
                   {{
-                    item.change_percent === null ? 'Unavailable' : exact(item.change_percent) + '%'
+                    item.change_percent === null
+                      ? 'Unavailable'
+                      : decimal(item.change_percent) + '%'
                   }}
                 </td>
                 <td>

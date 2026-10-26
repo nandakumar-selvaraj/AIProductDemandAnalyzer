@@ -36,7 +36,7 @@ import { ReportTable } from './report.models';
                 ) {
                   <span [class]="'status-chip ' + cell">{{ display(cell) }}</span>
                 } @else {
-                  {{ display(cell) }}
+                  {{ display(cell, table().headers[$index]) }}
                 }
               </td>
             }

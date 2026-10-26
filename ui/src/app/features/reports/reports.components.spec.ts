@@ -461,7 +461,7 @@ describe('Reports workspace', () => {
   });
 
   describe('Forecast Predictions Report', () => {
-    it('requires a completed run and displays exact, page-scoped predictions', async () => {
+    it('requires a completed run and displays rounded, page-scoped predictions', async () => {
       const ui = await setup(ForecastReportComponent, { kind: 'predictions' });
       request('/forecasts/runs').flush(runs());
       ui.fixture.detectChanges();
@@ -473,7 +473,7 @@ describe('Reports workspace', () => {
       expect(ui.root.textContent).toContain('Generating Forecast Predictions Report');
       request('/forecasts/7/predictions', 1, 50).flush(predictions());
       ui.fixture.detectChanges();
-      expect(ui.root.textContent).toContain('123.123456789123456789');
+      expect(ui.root.textContent).toContain('123.12');
       expect(ui.root.textContent).toContain('current page only');
       expect(ui.root.textContent).toContain(run.model_name);
       ui.click('Export Current Page');
@@ -642,7 +642,7 @@ describe('Reports workspace', () => {
       ui.fixture.detectChanges();
       expect(ui.root.textContent).toContain('N/A');
       expect(ui.root.textContent).toContain('Partial or unavailable coverage limits');
-      expect(ui.root.textContent).toContain('0.000');
+      expect(ui.root.textContent).toContain('0.00');
       ui.click('Export Evaluation CSV');
       expect(download.mock.lastCall?.[1].rows).toEqual([
         ['unavailable', 10, 0, 10, '0.000', null, null, 0, '0.000'],
@@ -683,8 +683,8 @@ describe('Reports workspace', () => {
         evaluation_status: 'partial',
       });
       ui.fixture.detectChanges();
-      expect(ui.root.textContent).toContain('1.234567891');
-      expect(ui.root.textContent).toContain('55.123456789');
+      expect(ui.root.textContent).toContain('1.23');
+      expect(ui.root.textContent).toContain('55.12');
       expect(ui.root.textContent).toContain('partial');
       expect(ui.root.querySelectorAll('th[scope="col"]')).toHaveLength(9);
     });
@@ -705,7 +705,7 @@ describe('Reports workspace', () => {
         'Reduce',
         'Insufficient Data',
         'N/A',
-        '12.123456789',
+        '12.12',
         'Returned reason',
         'not inventory levels',
       ])

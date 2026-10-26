@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, input } from '@angular/core';
 import { AccuracyMetrics } from '../../core/models/forecast.models';
-import { exactDecimal } from './forecast.helpers';
+import { twoDecimals } from '../../shared/number-format';
 
 @Component({
   selector: 'app-accuracy-metrics',
@@ -11,5 +11,5 @@ import { exactDecimal } from './forecast.helpers';
 })
 export class AccuracyMetricsComponent {
   readonly metrics = input.required<AccuracyMetrics>();
-  protected readonly exact = exactDecimal;
+  protected readonly decimal = (value: string | number | null) => twoDecimals(value, 'Unavailable');
 }

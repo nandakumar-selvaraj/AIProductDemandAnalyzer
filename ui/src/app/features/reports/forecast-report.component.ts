@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AlertComponent, SpinnerComponent } from '@coreui/angular';
 import { catchError, map, of, startWith, Subject, switchMap } from 'rxjs';
 import { ForecastRunItem } from '../../core/models/forecast.models';
+import { twoDecimals } from '../../shared/number-format';
 import { LoadState, requestState } from '../forecasts/forecast.helpers';
 import { RunOverviewComponent } from '../forecasts/run-overview.component';
 import { COMPLETE_EXPORT_LIMIT } from './complete-export';
@@ -42,6 +43,7 @@ interface ReportQuery {
 })
 export class ForecastReportComponent {
   readonly kind = input.required<ForecastReportType>();
+  protected readonly decimal = twoDecimals;
   private readonly facade = inject(ReportDataService);
   private readonly csv = inject(CsvDownloadService);
   private readonly queries = new Subject<ReportQuery | null>();

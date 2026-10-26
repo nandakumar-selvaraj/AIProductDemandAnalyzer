@@ -25,7 +25,8 @@
       <p class="note" id="prediction-chart-description">
         Approximate bar heights for {{ data.items.length }} individual rows on page
         {{ data.page }} of {{ data.total_pages }}. This is not a whole-run total or a time-series
-        aggregate. Exact values and identifiers are in the table below; row order follows the API.
+        aggregate. Values rounded to two decimal places and identifiers are in the table below; row
+        order follows the API.
       </p>
       <svg
         viewBox="0 0 1000 260"
@@ -53,8 +54,8 @@
       <div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable predictions table">
         <table class="table">
           <caption>
-            Exact predicted units · current page only. Ordered by forecast date, store, product and
-            prediction ID.
+            Predicted units rounded to two decimal places · current page only. Ordered by forecast
+            date, store, product and prediction ID.
           </caption>
           <thead>
             <tr>
@@ -70,7 +71,7 @@
                 <td>{{ item.forecast_date }}</td>
                 <td>{{ item.product_id }}</td>
                 <td>{{ item.store_id }}</td>
-                <td>{{ item.predicted_units }}</td>
+                <td>{{ decimal(item.predicted_units) }}</td>
               </tr>
             }
           </tbody>
@@ -86,7 +87,8 @@
       >
         Previous predictions</button
       ><span
-        >Page {{ data.page }} of {{ data.total_pages || 1 }} · {{ data.total_records }} predictions</span
+        >Page {{ data.page }} of {{ data.total_pages || 1 }} ·
+        {{ data.total_records }} predictions</span
       ><button
         type="button"
         class="btn btn-outline-primary"

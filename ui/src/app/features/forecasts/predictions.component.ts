@@ -4,6 +4,7 @@ import { AlertComponent, SpinnerComponent } from '@coreui/angular';
 import { startWith, Subject, switchMap } from 'rxjs';
 import { PredictionPage } from '../../core/models/forecast.models';
 import { ForecastApiService } from '../../core/services/forecast-api.service';
+import { twoDecimals } from '../../shared/number-format';
 import { LoadState, predictionBars, requestState } from './forecast.helpers';
 
 @Component({
@@ -14,6 +15,7 @@ import { LoadState, predictionBars, requestState } from './forecast.helpers';
 })
 export class PredictionsComponent {
   readonly runId = input.required<number>();
+  protected readonly decimal = twoDecimals;
   private readonly api = inject(ForecastApiService);
   private readonly pages = new Subject<number>();
   protected readonly page = signal(1);

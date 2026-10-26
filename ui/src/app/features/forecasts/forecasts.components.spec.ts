@@ -306,12 +306,12 @@ describe('Forecast workspace components', () => {
   });
 
   describe('Predictions', () => {
-    it('uses exact decimals, accessible page-scoped charts and server pages', async () => {
+    it('uses rounded decimals, accessible page-scoped charts and server pages', async () => {
       const ui = await setup(PredictionsComponent, { runId: 7 });
       expect(ui.root.textContent).toContain('Loading predictions');
       get('/forecasts/7/predictions', 1).flush(predictions());
       ui.fixture.detectChanges();
-      expect(ui.root.querySelector('table')?.textContent).toContain('123456789.123456789');
+      expect(ui.root.querySelector('table')?.textContent).toContain('123,456,789.12');
       expect(ui.root.querySelector('svg[role="img"]')?.getAttribute('aria-labelledby')).toContain(
         'prediction-chart-description',
       );
@@ -376,10 +376,10 @@ describe('Forecast workspace components', () => {
       http.expectNone(`${base}/forecasts/evaluate`);
       request.flush(evaluation);
       ui.fixture.detectChanges();
-      expect(ui.root.textContent).toContain('2.123456789');
-      expect(ui.root.textContent).toContain('21.23456789%');
+      expect(ui.root.textContent).toContain('2.12');
+      expect(ui.root.textContent).toContain('21.23%');
       expect(ui.root.textContent).toContain('matching observations only');
-      expect(ui.root.textContent).toContain('50.000%');
+      expect(ui.root.textContent).toContain('50.00%');
     });
     it('does not evaluate incomplete runs', async () => {
       const ui = await setup(EvaluationComponent, { run: { ...run, status: 'running' } });
@@ -409,7 +409,7 @@ describe('Forecast workspace components', () => {
       ui.click('Evaluate run');
       get('/forecasts/evaluate').flush({ ...evaluation, mae: '0.000', wape_percent: '0.000' });
       ui.fixture.detectChanges();
-      expect(ui.root.textContent).toContain('0.000%');
+      expect(ui.root.textContent).toContain('0.00%');
     });
     it.each([404, 409, 422, 503])(
       'shows an actionable %s error and retries the same run',
@@ -463,9 +463,9 @@ describe('Forecast workspace components', () => {
         Array.from(ui.root.querySelectorAll('.status-chip')).map((node) => node.textContent),
       ).toEqual(['Increase', 'Maintain', 'Reduce', 'Insufficient data']);
       expect(ui.root.textContent).toContain('Unavailable');
-      expect(ui.root.textContent).toContain('0.000%');
+      expect(ui.root.textContent).toContain('0.00%');
       expect(ui.root.textContent).toContain('12/30 historical days');
-      expect(ui.root.textContent).toContain('12.123456789');
+      expect(ui.root.textContent).toContain('12.12');
       expect(ui.root.textContent).toContain('Incomplete historical coverage.');
       expect(ui.root.textContent).toContain('not purchase orders');
       expect(ui.root.querySelector('caption')).not.toBeNull();

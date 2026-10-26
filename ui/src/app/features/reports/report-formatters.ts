@@ -4,6 +4,7 @@ import {
   RecommendationItem,
 } from '../../core/models/forecast.models';
 import { CsvCell, ReportTable, RunReportContext } from './report.models';
+import { twoDecimals } from '../../shared/number-format';
 
 export function runContext(context: RunReportContext, scope: string): Record<string, CsvCell> {
   return {
@@ -89,8 +90,21 @@ export function evaluationTable(item: EvaluationResult): ReportTable {
 export function runFilename(type: string, context: RunReportContext, scope: string): string {
   return `${type}-run-${context.run.id}-cutoff-${context.run.training_cutoff}-horizon-${context.run.horizon_days}-${scope}.csv`;
 }
-export function displayCell(value: CsvCell): string {
+export function displayCell(value: CsvCell, column = ''): string {
   if (value === null) return 'N/A';
+  if (
+    [
+      'predicted_units',
+      'historical_daily_average',
+      'forecast_daily_average',
+      'change_percent',
+      'coverage_percent',
+      'mae',
+      'wape_percent',
+      'total_predicted_units',
+    ].includes(column)
+  )
+    return twoDecimals(value);
   const labels: Record<string, string> = {
     increase: 'Increase',
     maintain: 'Maintain',

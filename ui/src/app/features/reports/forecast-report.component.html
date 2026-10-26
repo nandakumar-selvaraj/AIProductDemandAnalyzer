@@ -32,7 +32,8 @@
       <div>
         <h2>Report results</h2>
         <p class="note">
-          Filtered API data · {{ title() }}. CSV actions appear when a report is ready.
+          Filtered API data · {{ title() }}. Decimals display two places; CSV exports retain full
+          precision.
         </p>
       </div>
       @if (result(); as snapshot) {
@@ -91,13 +92,13 @@
         @if (report.kind === 'evaluation') {
           <div class="report-kpis">
             <div>
-              MAE (units)<strong>{{ report.data.mae ?? 'N/A' }}</strong>
+              MAE (units)<strong>{{ decimal(report.data.mae) }}</strong>
             </div>
             <div>
-              WAPE (%)<strong>{{ report.data.wape_percent ?? 'N/A' }}</strong>
+              WAPE (%)<strong>{{ decimal(report.data.wape_percent) }}</strong>
             </div>
             <div>
-              Matching coverage (%)<strong>{{ report.data.coverage_percent }}</strong>
+              Matching coverage (%)<strong>{{ decimal(report.data.coverage_percent) }}</strong>
             </div>
             <div>
               Evaluation status<strong>{{ report.data.evaluation_status }}</strong>
@@ -115,8 +116,9 @@
           <p class="note">
             Demand-trend signals only, not inventory levels, purchase quantities or reorder
             instructions. Missing history is not zero. Thresholds returned by the API: increase
-            {{ report.data.increase_threshold_percent }}% · reduce
-            {{ report.data.reduce_threshold_percent }}%. Coverage is historical days out of 30.
+            {{ decimal(report.data.increase_threshold_percent) }}% · reduce
+            {{ decimal(report.data.reduce_threshold_percent) }}%. Coverage is historical days out of
+            30.
           </p>
         }
         @if (paged(); as data) {

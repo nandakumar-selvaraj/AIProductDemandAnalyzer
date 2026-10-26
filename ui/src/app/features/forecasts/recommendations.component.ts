@@ -8,7 +8,8 @@ import {
   RunContext,
 } from '../../core/models/forecast.models';
 import { ForecastApiService } from '../../core/services/forecast-api.service';
-import { exactDecimal, LoadState, requestState } from './forecast.helpers';
+import { LoadState, requestState } from './forecast.helpers';
+import { twoDecimals } from '../../shared/number-format';
 
 @Component({
   selector: 'app-forecast-recommendations',
@@ -21,7 +22,7 @@ export class RecommendationsComponent {
   private readonly api = inject(ForecastApiService);
   private readonly pages = new Subject<number>();
   protected readonly page = signal(1);
-  protected readonly exact = exactDecimal;
+  protected readonly decimal = (value: string | number | null) => twoDecimals(value, 'Unavailable');
   protected readonly labels: Record<RecommendationLabel, string> = {
     increase: 'Increase',
     maintain: 'Maintain',
