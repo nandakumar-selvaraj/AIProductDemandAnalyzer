@@ -255,3 +255,10 @@ The UI foundation uses the official [CoreUI Free Angular Admin Template](https:/
 ## Git conventions
 
 The UI is part of the main repository. Shared ignore rules are maintained in the root [`.gitignore`](../.gitignore), covering local configuration, `node_modules`, Angular caches, test output, and generated builds. Commit source, configuration, documentation, and the npm lockfile.
+
+## Browser end-to-end validation
+
+Run `npm run e2e` for database-backed browser workflows and `npm run e2e:ollama`
+only when explicitly testing real local inference. See
+[E2E validation and setup](../docs/E2E_VALIDATION.md) for prerequisites, safe
+synthetic fixtures, CI behavior, artifact privacy and the actual validation results.

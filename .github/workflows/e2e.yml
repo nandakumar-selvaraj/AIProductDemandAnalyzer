@@ -1,0 +1,93 @@
+name: E2E (synthetic PostgreSQL)
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: demand_analyzer_e2e_test
+          POSTGRES_USER: postgres
+          # Disposable CI-only credential, never a real account or repository secret.
+          POSTGRES_PASSWORD: e2e-disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d demand_analyzer_e2e_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:e2e-disposable@127.0.0.1:5432/demand_analyzer_e2e_test
+      E2E_ALLOW_SEED: "1"
+      AI_ENABLED: "false"
+      E2E_AI_DISABLED: "1"
+      E2E_CAPTURE_ARTIFACTS: "1"
+      E2E_PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Migrate and seed disposable synthetic database
+        working-directory: backend
+        run: |
+          python -m alembic upgrade head
+          python -m scripts.seed_e2e
+      - name: Install UI and browser
+        working-directory: ui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Start FastAPI and check readiness
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/e2e-api.log 2>&1 &
+          python - <<'PY'
+          import time
+          import httpx
+          for attempt in range(60):
+              try:
+                  if httpx.get('http://127.0.0.1:8000/api/v1/ready').status_code == 200:
+                      break
+              except httpx.HTTPError:
+                  pass
+              time.sleep(1)
+          else:
+              raise SystemExit('FastAPI did not become ready')
+          PY
+      - name: Run Chromium E2E (Ollama excluded)
+        working-directory: ui
+        run: |
+          npm run e2e:typecheck
+          npm run e2e
+      - name: Upload synthetic-only failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-e2e-failures
+          retention-days: 7
+          path: |
+            ui/playwright-report/
+            ui/test-results/
+            /tmp/e2e-api.log
+          if-no-files-found: ignore

@@ -39,6 +39,33 @@ ui/typings/
 npm-debug.log
 yarn-error.log
 
+# E2E captures can contain business records, prompts, and local machine paths.
+/validation/
+**/playwright-report/
+**/test-results/
+**/blob-report/
+**/e2e-artifacts/
+**/generated-reports/
+**/logs/
+**/screenshots/
+**/videos/
+**/traces/
+**/coverage/
+**/.nyc_output/
+coverage.xml
+*.lcov
+*.har
+*.webm
+*.trace.zip
+*.pem
+*.key
+*.p12
+*.pfx
+**/storage-state*.json
+**/.auth/
+**/secrets/
+*.local
+
 # Editor and OS files
 .vscode/
 .idea/
