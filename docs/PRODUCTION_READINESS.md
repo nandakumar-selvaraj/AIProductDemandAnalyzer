@@ -1,3 +1,19 @@
+# Docker validation follow-up: TLS probe — 2026-10-28
+
+Commit ccf6386 passed container creation, PostgreSQL initialization, migrations and
+synthetic seeding on the Linux runner, then exposed a second validation-client defect:
+HTTPS connected to 127.0.0.1 while the internal Caddy site/certificate was localhost.
+An HTTP Host override does not set TLS SNI. The probe now uses the correct localhost
+URL and validates the chain/hostname using Caddy's generated public test CA certificate,
+rather than disabling certificate verification. Browser tests still use their explicit
+internal-CA test setting; production public-certificate policy is unchanged.
+
+Diagnostics now include redacted stdout/stderr and container logs on failure, with
+bounded command timeouts and no environment dumps. Regression tests cover the Caddy
+hostname contract. Full Docker validation continues on the follow-up commit.
+
+---
+
 # Docker validation repair — 2026-10-28
 
 The production-stack failure on 29a415c was reproduced by rerunning workflow

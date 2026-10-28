@@ -55,3 +55,12 @@ def test_mount_fix_cannot_remove_container_safeguards(field, value):
     config["services"]["backend"][field] = value
     with pytest.raises(ValueError, match="safeguards are required"):
         validator.validate_compose_config(config)
+
+
+def test_https_probe_uses_the_configured_caddy_certificate_hostname():
+    request = validator.probe_request(15443, "/api/v1/ready")
+    assert request.host == "localhost:15443"
+    assert request.full_url == "https://localhost:15443/api/v1/ready"
+    assert "https://localhost {" in (source.parent / "Caddyfile.validation").read_text()
+    # No spoofed HTTP Host header: URL authority also determines TLS SNI.
+    assert request.get_header("Host") is None

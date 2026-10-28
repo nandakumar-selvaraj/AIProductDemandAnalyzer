@@ -7,6 +7,7 @@ Requires Docker Compose v2.24.4+ (!override), Docker Engine and Linux containers
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import socket
@@ -39,6 +40,13 @@ def validate_compose_config(configuration):
             raise ValueError(
                 f"{service}: production filesystem/capability safeguards are required"
             )
+
+
+def probe_request(port, path, data=None, headers=None):
+    """TLS SNI, certificate hostname and HTTP authority must all match Caddy's site."""
+    return urllib.request.Request(
+        f"https://localhost:{port}{path}", data=data, headers=headers or {}
+    )
 
 
 def main():
@@ -108,22 +116,40 @@ def main():
     admin_email = "admin-" + secrets.token_hex(4) + "@example.invalid"
     viewer_email = "viewer-" + secrets.token_hex(4) + "@example.invalid"
     owned = False
+    tls_context = None
 
-    def run(args, *, input=None):
-        # Capture output: never dump Compose environments or connection strings to CI logs.
-        result = subprocess.run(
-            args, input=input, capture_output=True, cwd=ROOT, env=env
+    def redact(value):
+        for secret in (password, reader_password, owner_password, token, test_password):
+            value = value.replace(secret, "[REDACTED]")
+        return re.sub(
+            r"\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b",
+            "[REDACTED JWT]",
+            value,
         )
+
+    def run(args, *, input=None, timeout=600):
+        # Capture output: never dump Compose environments or connection strings to CI logs.
+        try:
+            result = subprocess.run(
+                args,
+                input=input,
+                capture_output=True,
+                cwd=ROOT,
+                env=env,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(
+                f"Command {args[0]} timed out after {timeout} seconds"
+            ) from None
         if result.returncode:
-            error = result.stderr.decode(errors="replace")[-6000:]
-            for secret in (
-                password,
-                reader_password,
-                owner_password,
-                token,
-                test_password,
-            ):
-                error = error.replace(secret, "[REDACTED]")
+            error = redact(
+                (
+                    result.stdout.decode(errors="replace")
+                    + "\n"
+                    + result.stderr.decode(errors="replace")
+                )[-12000:]
+            )
             raise RuntimeError(f"Command {args[0]} failed: {error}")
         return result.stdout
 
@@ -152,15 +178,11 @@ def main():
         )
 
     def request(path, expected=200, data=None, headers=None, return_headers=False):
-        req = urllib.request.Request(
-            f"https://127.0.0.1:{port}{path}",
-            data=data,
-            headers={"Host": "localhost", **(headers or {})},
-        )
-        # Internal CA only for this loopback-bound disposable stack; never production.
+        req = probe_request(port, path, data=data, headers=headers)
+        # Trust only the internal test CA and verify localhost's certificate/hostname.
         try:
             with urllib.request.urlopen(
-                req, context=ssl._create_unverified_context(), timeout=15
+                req, context=tls_context, timeout=15
             ) as response:
                 assert response.status == expected
                 body = response.read()
@@ -180,7 +202,7 @@ def main():
         )
         if options.config_only:
             return
-        run(["docker", "info", "--format", "{{.ServerVersion}}"])
+        run(["docker", "info", "--format", "{{.ServerVersion}}"], timeout=30)
         existing = run(
             [
                 "docker",
@@ -262,6 +284,10 @@ def main():
             assert config["RestartPolicy"]["Name"] == "unless-stopped"
             if service != "proxy":
                 assert not config["PortBindings"]
+        certificate = compose(
+            "exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt"
+        ).decode()
+        tls_context = ssl.create_default_context(cadata=certificate)
         assert "<app-root" in request("/").decode()
         request("/forecasts")  # SPA fallback
         request("/api/v1/health")
@@ -453,6 +479,23 @@ def main():
         print(
             "Docker integration validation completed; disposable stack will be removed"
         )
+    except Exception:
+        if owned:
+            try:
+                print(
+                    redact(
+                        compose("logs", "--no-color", "--tail", "80").decode(
+                            errors="replace"
+                        )
+                    ),
+                    flush=True,
+                )
+            except Exception:
+                print(
+                    "Container diagnostics unavailable; original validation failure follows.",
+                    flush=True,
+                )
+        raise
     finally:
         try:
             if owned:
