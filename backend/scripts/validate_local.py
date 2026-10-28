@@ -23,6 +23,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 modes = parser.add_mutually_exclusive_group()
 modes.add_argument("--postgres-only", action="store_true")
 modes.add_argument("--demo-seed-only", action="store_true")
+modes.add_argument("--auth-e2e", action="store_true")
 options = parser.parse_args()
 root = Path(__file__).resolve().parents[2]
 work = root / "validation" / "phase7b-e2e"
@@ -66,6 +67,7 @@ try:
         "PUBLIC_DEMO_ENABLED": "false",
         "DEMO_AI_ENABLED": "false",
         "AI_ENABLED": "false",
+        "AUTH_ENABLED": "false",
         "E2E_ALLOW_SEED": "1",
         "DEMO_ALLOW_SEED": "1",
         "TEST_DATABASE_URL": test_url,
@@ -119,6 +121,36 @@ try:
         E2E_API_URL=f"http://127.0.0.1:{api_port}/api/v1/",
         E2E_BASE_URL=f"http://127.0.0.1:{ui_port}",
     )
+    if options.auth_e2e:
+        env.update(
+            AUTH_ENABLED="true",
+            JWT_SIGNING_SECRET=secrets.token_hex(32),
+            AUTH_ALLOWED_ORIGINS='["http://127.0.0.1:' + str(ui_port) + '"]',
+            E2E_AUTH="1",
+            E2E_AUTH_PASSWORD=secrets.token_urlsafe(24),
+            E2E_ADMIN_EMAIL="admin-" + secrets.token_hex(4) + "@example.invalid",
+            E2E_VIEWER_EMAIL="viewer-" + secrets.token_hex(4) + "@example.invalid",
+        )
+        for role, email_key in (("admin", "E2E_ADMIN_EMAIL"), ("viewer", "E2E_VIEWER_EMAIL")):
+            provision = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.manage_users",
+                    "create",
+                    "--email",
+                    env[email_key],
+                    "--role",
+                    role,
+                    "--password-stdin",
+                ],
+                input=env["E2E_AUTH_PASSWORD"] + "\n",
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if provision.returncode:
+                raise RuntimeError("Synthetic user provisioning failed; credentials omitted")
     proxy = work / "proxy.json"
     proxy.write_text('{"/api":{"target":"http://127.0.0.1:' + str(api_port) + '","secure":false}}')
     commands = [
@@ -150,6 +182,8 @@ try:
             root / "ui",
         ),
     ]
+    if options.auth_e2e:
+        commands[1][0].extend(["--configuration", "authentication"])
     for i, (args, cwd) in enumerate(commands):
         log = (work / f"server-{i}.log").open("w")
         logs.append(log)
@@ -165,9 +199,10 @@ try:
         )
     wait(f"http://127.0.0.1:{api_port}/api/v1/ready")
     wait(f"http://127.0.0.1:{ui_port}")
-    result = subprocess.run(
-        ["node", "node_modules/@playwright/test/cli.js", "test"], cwd=root / "ui", env=env
-    )
+    browser_args = ["node", "node_modules/@playwright/test/cli.js", "test"]
+    if options.auth_e2e:
+        browser_args.append("authentication.spec.ts")
+    result = subprocess.run(browser_args, cwd=root / "ui", env=env)
     if result.returncode:
         raise RuntimeError("Isolated synthetic E2E suite failed")
     print("PASS: synthetic-only browser E2E; no development data used")

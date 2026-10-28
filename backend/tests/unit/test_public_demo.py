@@ -12,6 +12,8 @@ from app.api.v1.endpoints.demo import DemoQuestion
 from app.core.config import Settings
 from app.core.security import SecurityMiddleware
 from app.db import session as sessions
+from tests.auth_helpers import headers as admin_headers
+from tests.auth_helpers import install
 
 TOKEN = "operator-test-token-" * 4
 
@@ -21,6 +23,9 @@ def settings(**kwargs):
         _env_file=None,
         environment="production",
         operator_token=TOKEN,
+        auth_enabled=True,
+        jwt_signing_secret="synthetic-test-signing-secret-" * 3,
+        auth_allowed_origins=["https://testserver"],
         database_url="postgresql+psycopg://private:pass@localhost/private",
         public_demo_enabled=True,
         demo_database_url="postgresql+psycopg://demand_demo_reader:pass@db/showcase_demo",
@@ -30,6 +35,7 @@ def settings(**kwargs):
 
 
 def client_for(monkeypatch, config):
+    install(monkeypatch)
     monkeypatch.setattr("app.core.security.get_settings", lambda: config)
     probe = FastAPI()
 
@@ -55,7 +61,7 @@ def test_public_cannot_mutate_or_bypass_operator(monkeypatch, path):
     client = client_for(monkeypatch, settings())
     assert client.post(path, json={}).status_code == 401
     assert client.delete(path).status_code == 401
-    assert client.post(path, headers={"Authorization": f"Bearer {TOKEN}"}).status_code == 200
+    assert client.post(path, headers=admin_headers(settings())).status_code == 200
 
 
 def test_default_production_reads_private_and_unknown_routes_denied(monkeypatch):
@@ -67,7 +73,7 @@ def test_default_production_reads_private_and_unknown_routes_denied(monkeypatch)
     assert client.get("/api/v1/forecasts/1/evaluation").status_code == 200
     assert client.get("/api/v1/new-private-route").status_code == 401
     assert client.get("/api/v1/assistant/ready").status_code == 401
-    assert client.get("/api/v1/products", headers={"Authorization": f"Bearer {TOKEN}"}).json() == {
+    assert client.get("/api/v1/products", headers=admin_headers(settings())).json() == {
         "public_demo": False
     }
 
@@ -138,7 +144,7 @@ def test_phase7a_usage_is_carried_forward(monkeypatch, tmp_path):
             "INSERT INTO usage VALUES (?, 100)", (datetime.now(UTC).date().isoformat(),)
         )
     client = client_for(monkeypatch, settings(ai_usage_file=str(usage)))
-    response = client.get("/api/v1/assistant/ready", headers={"Authorization": f"Bearer {TOKEN}"})
+    response = client.get("/api/v1/assistant/ready", headers=admin_headers(settings()))
     assert response.status_code == 429
 
 

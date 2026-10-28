@@ -334,3 +334,59 @@ def test_assistant_http_contract_and_owner_boundary(db):
             )
     finally:
         app.dependency_overrides.clear()
+
+
+def test_authenticated_conversation_cannot_be_reused_by_another_account(db, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    from app.core.config import get_settings
+    from app.services.auth_service import Principal, csrf_token
+
+    config = settings(
+        auth_enabled=True,
+        jwt_signing_secret="synthetic-signing-key-" * 4,
+        auth_allowed_origins=["https://testserver"],
+    )
+    monkeypatch.setattr("app.core.security.get_settings", lambda: config)
+
+    def identity(scope, settings):
+        name = dict(scope["headers"]).get(b"cookie", b"").decode()
+        return Principal(
+            name,
+            name + "@example.invalid",
+            "viewer",
+            name * 16,
+            datetime.now(UTC) + timedelta(minutes=30),
+        )
+
+    monkeypatch.setattr("app.core.security.authenticate_request", identity)
+    app.dependency_overrides[get_settings] = lambda: config
+    app.dependency_overrides[get_ai_provider] = lambda: FakeProvider()
+    app.dependency_overrides[get_db] = lambda: db
+    shared_client_id = str(uuid4())
+
+    def headers(name):
+        return {
+            "Cookie": name,
+            "Origin": "https://testserver",
+            "X-CSRF-Token": csrf_token(config, name * 16),
+            "X-Assistant-Session": shared_client_id,
+        }
+
+    try:
+        client = TestClient(app, base_url="https://testserver")
+        first = client.post(
+            "/api/v1/assistant/chat",
+            json={"message": "Explain the latest forecast."},
+            headers=headers("alice"),
+        )
+        assert first.status_code == 200
+        stolen = client.post(
+            "/api/v1/assistant/chat",
+            headers=headers("bob"),
+            json={"message": "Explain more.", "conversation_id": first.json()["conversation_id"]},
+        )
+        assert stolen.status_code == 404
+        assert stolen.json()["error"]["code"] == "conversation_not_found"
+    finally:
+        app.dependency_overrides.clear()

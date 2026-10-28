@@ -11,6 +11,8 @@ from app.core.config import Settings
 from app.core.security import SecurityMiddleware
 from app.main import app
 from app.services.ai_provider import HostedProvider, ProviderError
+from tests.auth_helpers import headers as admin_headers
+from tests.auth_helpers import install
 
 DB = "postgresql+psycopg://test:test@localhost/test"
 TOKEN = "a" * 64
@@ -18,7 +20,14 @@ TOKEN = "a" * 64
 
 def production(**kwargs):
     return Settings(
-        _env_file=None, database_url=DB, environment="production", operator_token=TOKEN, **kwargs
+        _env_file=None,
+        database_url=DB,
+        environment="production",
+        operator_token=TOKEN,
+        auth_enabled=True,
+        jwt_signing_secret="synthetic-test-signing-secret-" * 3,
+        auth_allowed_origins=["https://testserver"],
+        **kwargs,
     )
 
 
@@ -38,6 +47,7 @@ def test_production_fails_closed():
 
 
 def test_operator_gate_before_database_and_body(monkeypatch):
+    install(monkeypatch)
     settings = production(max_request_bytes=10)
     monkeypatch.setattr("app.core.security.get_settings", lambda: settings)
     client = TestClient(app)
@@ -50,17 +60,18 @@ def test_operator_gate_before_database_and_body(monkeypatch):
         client.post(
             "/api/v1/ingestion/sales",
             content=b"x" * 11,
-            headers={"Authorization": f"Bearer {TOKEN}"},
+            headers=admin_headers(settings),
         ).status_code
         == 413
     )
 
 
 def test_rate_and_daily_cap(monkeypatch):
+    install(monkeypatch)
     settings = production(ai_requests_per_minute=1, ai_daily_request_cap=2)
     monkeypatch.setattr("app.core.security.get_settings", lambda: settings)
     client = TestClient(SecurityMiddleware(app))
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = admin_headers(settings)
     client.get("/api/v1/assistant/ready", headers=headers)
     assert client.get("/api/v1/assistant/ready", headers=headers).status_code == 429
 
@@ -122,9 +133,10 @@ def test_hosted_contract(mode):
 
 
 def test_daily_cap_survives_middleware_recreation(monkeypatch, tmp_path):
+    install(monkeypatch)
     settings = production(ai_usage_file=str(tmp_path / "usage.sqlite"), ai_daily_request_cap=1)
     monkeypatch.setattr("app.core.security.get_settings", lambda: settings)
-    headers = {"Authorization": f"Bearer {TOKEN}"}
+    headers = admin_headers(settings)
     TestClient(SecurityMiddleware(app)).get("/api/v1/assistant/ready", headers=headers)
     response = TestClient(SecurityMiddleware(app)).get("/api/v1/assistant/ready", headers=headers)
     assert response.status_code == 429

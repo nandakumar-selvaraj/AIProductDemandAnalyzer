@@ -4,7 +4,13 @@ x-api: &api
   environment:
     ENVIRONMENT: production
     DATABASE_URL: ${DATABASE_URL:?required}
-    OPERATOR_TOKEN: ${OPERATOR_TOKEN:?required}
+    AUTH_ENABLED: "true"
+    JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?required}
+    JWT_ISSUER: ${JWT_ISSUER:-ai-product-demand-analyzer}
+    JWT_AUDIENCE: ${JWT_AUDIENCE:-demand-analyzer-browser}
+    AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:?required}
+    AUTH_ACCESS_TOKEN_MINUTES: ${AUTH_ACCESS_TOKEN_MINUTES:-30}
+    AUTH_LOGIN_REQUESTS_PER_MINUTE: ${AUTH_LOGIN_REQUESTS_PER_MINUTE:-10}
     TRUSTED_HOSTS: ${TRUSTED_HOSTS:?required}
     PUBLIC_DEMO_ENABLED: ${PUBLIC_DEMO_ENABLED:-false}
     DEMO_DATABASE_URL: ${DEMO_DATABASE_URL:-}
@@ -60,7 +66,9 @@ services:
     <<: *api
     environment:
       ENVIRONMENT: production
-      OPERATOR_TOKEN: ${OPERATOR_TOKEN:?required}
+      AUTH_ENABLED: "true"
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?required}
+      AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:?required}
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:?required}
       DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
     command: [alembic, upgrade, head]

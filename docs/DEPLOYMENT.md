@@ -27,13 +27,14 @@ before purchase. Three isolated PostgreSQL instances fit only light portfolio us
    of Git, CI artifacts and screenshots. Only trusted host admins can access Docker.
 3. Set explicit JSON `TRUSTED_HOSTS`, domain and ACME email. Keep `127.0.0.1` for health
    probes. No wildcard hosts. CORS is denied by default: use the same HTTPS origin.
-4. Production data routes require an operator Bearer token by default. Public access
-   is explicit opt-in via PUBLIC_DEMO_ENABLED and uses DEMO_DATABASE_URL, never the
-   private runtime connection. All writes and unrestricted assistant routes still
-   require `Authorization: Bearer <OPERATOR_TOKEN>`. This is one operator role, not
-   multi-user identity. Rotate by replacing the token and recreating the backend.
-   Angular receives no operator/provider secret and offers no production write forms.
-   Use a trusted API client for operator tasks.
+4. Production requires JWT cookie authentication for protected routes; AUTH_ENABLED=false
+   is forbidden there. Configure a random JWT_SIGNING_SECRET (64+ characters), exact
+   HTTPS AUTH_ALLOWED_ORIGINS, issuer/audience and the default 30-minute lifetime.
+   OPERATOR_TOKEN no longer grants HTTP access. Apply migrations and provision admin /
+   restricted viewer accounts through the owner CLI described in AUTHENTICATION.md.
+   Angular receives no operator/provider/signing secret. Admins can write; viewers can
+   read, evaluate/backtest and use the rate-limited assistant. Anonymous public access
+   remains explicit opt-in on /demo routes using the separate synthetic reader DB.
 5. Verify fresh PostgreSQL initialization and backup restoration on a disposable stack.
    The init script runs only on a new volume and creates `demand_app` with DML/sequence
    access, plus a SELECT-only `demand_demo_reader`; only the owner migrates. Existing volumes need a reviewed role provisioning
@@ -54,7 +55,7 @@ curl --fail https://YOUR_DOMAIN/api/v1/ready
 ```
 
 Do not use `down -v`. The migration service is an explicit tools profile job; regular
-`up` does not migrate. Alembic has one revision (`0001_initial`). Before each upgrade,
+`up` does not migrate. Alembic head is `0002_authentication`, following `0001_initial`. Before each upgrade,
 back up and review `alembic upgrade head --sql`; validate live `alembic current` and
 `alembic check` on staging. Never run downgrade against valuable data: initial downgrade
 drops all application tables. Owner secrets are absent from the running API environment.
@@ -146,7 +147,7 @@ docker compose --env-file .env.production -f compose.production.yml run --rm \
 4. Set PUBLIC_DEMO_ENABLED=true and recreate the backend. Startup validates the marker
    through the demo reader connection. No marker or missing reader rights means startup
    fails. Public queries use a read-only transaction, SELECT-only role, two-connection
-   pool and five-second statement timeout. Operator calls retain their original DB.
+   pool and five-second statement timeout. Admin calls retain their original DB; demo viewers remain on synthetic reads.
 5. Angular shows the historical synthetic data banner, hides forecast creation and
    backtesting, uses GET evaluation, and offers guided demo questions only when enabled.
    Server-side route allowlists and database permissions enforce these boundaries even
@@ -164,7 +165,7 @@ both be enabled with HTTPS hosted configuration. `/api/v1/demo/assistant` accept
 one enum question_id (forecast, historical, accuracy); extra fields/free-form text,
 context IDs and conversation IDs are rejected. Each call is stateless, retrieves only
 from the demo database and uses unchanged deterministic evidence verification.
-Unrestricted `/assistant/*` remains operator-only. No operator token, API key or signed
+Unrestricted `/assistant/*` requires an authenticated admin/viewer session and server limits. No operator token, API key or signed
 admin capability is issued to the browser.
 
 Anonymous clients share a global read allowance (120/minute), guided AI allowance
@@ -187,3 +188,24 @@ SELECT grants with a reviewed owner SQL change, rather than deleting volumes. Re
 demo databases also need reader grants and a deliberate marker after synthetic-data
 verification; database comments are not recreated by the ordinary per-DB dump script.
 See SHARED_VPS_ARCHITECTURE.md for ingress/network separation across all three demos.
+
+
+## JWT deployment transition
+
+See AUTHENTICATION.md for the full login/logout/expiry/CSRF/RBAC lifecycle. The previous
+operator Bearer secret is deprecated and ignored by HTTP authorization. Apply the new
+additive migration before starting the updated API; provision explicit accounts with
+owner credentials, never a default password or public registration endpoint.
+
+The production Angular build always enables route guards and HttpOnly-cookie sessions.
+For local authenticated development, use `ng serve --configuration authentication`,
+AUTH_ENABLED=true on FastAPI, a random signing key and an approved loopback origin.
+Default unauthenticated local development remains unchanged. Cookies are Secure only
+in production; production AUTH_ALLOWED_ORIGINS must all use HTTPS.
+
+Take a backup before upgrading. Auth schema rollback would remove users/sessions, so
+prefer a forward fix or compatible application image rollback. A signing-key change
+invalidates all JWTs and requires users to log in again. Preserve session records across
+API restarts so logout revocation remains effective. Periodically purge only expired
+sessions with the owner CLI after deployment approval. Never restore broad SELECT grants
+to the public reader: auth_users and auth_sessions must remain private.

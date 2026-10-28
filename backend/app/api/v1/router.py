@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     assistant,
+    auth,
     dashboard,
     demo,
     forecasts,
@@ -14,6 +15,7 @@ from app.api.v1.endpoints import (
 )
 
 api_router = APIRouter()
+api_router.include_router(auth.router)
 api_router.include_router(demo.router)
 api_router.include_router(assistant.router)
 api_router.include_router(health.router)

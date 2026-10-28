@@ -1,3 +1,70 @@
+# Current readiness — JWT authentication and RBAC (2026-10-28)
+
+JWT browser sessions now replace operator Bearer authorization in production. The
+previous Phase 7B container/demo preparation was committed as ce6515a before this work;
+the JWT implementation is not committed or pushed. No UpCloud/cloud deployment occurred.
+
+Production requires AUTH_ENABLED=true, a random server signing key and exact HTTPS
+origins. HttpOnly/Secure/Strict cookies carry 30-minute HS256 JWTs backed by revocable
+DB sessions. Users/roles/active state are checked on every protected request. Login uses
+Argon2id and global rate/concurrency admission; logout revokes the session immediately.
+Origin plus session-bound CSRF protects authenticated POSTs. Admin writes and viewer
+analytical POSTs are explicitly separated. Public synthetic demo reads remain isolated.
+Auth tables are excluded from demo-reader grants; owner CLI alone provisions users.
+
+Local validation: 166 backend tests passed (one optional integration skipped in the main
+run); PostgreSQL migration/upsert integration and demo seed checks passed separately in
+new disposable DBs. Angular: 253 tests passed, production build passed. JWT browser E2E:
+4 passed using random synthetic users, including admin/viewer login, refresh, expiry,
+viewer upload denial, analytical evaluation, logout replay rejection and Back protection.
+Ruff, Angular lint and E2E TypeScript checks passed. Production/disposable Compose config
+validation and Git whitespace checks passed. The production build is 661.97 kB initial
+(estimated transfer 122.31 kB). The resolved Python production dependency audit reports
+no known vulnerabilities. Legacy synthetic browser tests: 8 passed, 7 skipped (the four
+JWT tests ran separately; three production-Docker tests remain unexecuted).
+
+Executed commands (backend working directory unless specified):
+
+```text
+venv/Scripts/python.exe -m pytest tests -q
+venv/Scripts/python.exe -m scripts.validate_local --postgres-only
+venv/Scripts/python.exe -m scripts.validate_local --demo-seed-only
+venv/Scripts/python.exe -m scripts.validate_local --auth-e2e
+venv/Scripts/python.exe -m scripts.validate_local
+```
+
+Repository-root static/config checks:
+
+```text
+backend/venv/Scripts/python.exe -m ruff check backend deploy/validate_docker.py
+backend/venv/Scripts/python.exe -m ruff format --check backend deploy/validate_docker.py
+backend/venv/Scripts/python.exe deploy/validate_docker.py --config-only
+docker compose --env-file .env.production.example -f compose.production.yml config --quiet
+git diff --check
+```
+
+From ui: `npm test -- --watch=false` with TEMP/TMP set to ui/tmp,
+`node node_modules/eslint/bin/eslint.js src --max-warnings=0`, `npm run e2e:typecheck`,
+and `npm run build -- --configuration production`. Local browser runs used installed
+Edge and socket permission outside the Windows sandbox. The dependency audit used
+`python -m pip_audit -r backend/requirements.production.txt` from an isolated ignored
+tool directory; no audit tool was added to runtime dependencies. Docker info still
+failed because the Linux engine pipe is absent. No remote CI run was triggered.
+
+Remaining deployment gates are unchanged: Docker Linux engine is unavailable locally,
+so production container startup, restore/ACL checks and production-cookie browser runs
+must pass in the configured workflow. Configure real secrets/origins, scan/pin final
+images, verify HTTPS and off-host recovery, and measure concurrent-login/forecast memory
+before launch. CI is configured, not claimed as executed. AI remains off by default.
+
+No default users, public registration, refresh tokens, frontend JWT storage or legacy
+operator bypass are introduced. Development auth is optional via an explicit profile;
+production cannot disable it. See AUTHENTICATION.md, DEPLOYMENT.md and BACKUP_RESTORE.md.
+
+---
+
+## Historical Phase 7B assessment (superseded by JWT authentication above)
+
 # Current readiness — Phase 7B (2026-10-28)
 
 Phase 7B implementation is prepared and local application checks passed. **Production

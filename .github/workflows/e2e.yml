@@ -80,6 +80,11 @@ jobs:
         run: |
           npm run e2e:typecheck
           npm run e2e
+      - name: Validate JWT admin/viewer browser sessions in another disposable database
+        working-directory: backend
+        env:
+          E2E_BROWSER_CHANNEL: chromium
+        run: python -m scripts.validate_local --auth-e2e
       - name: Upload synthetic-only failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

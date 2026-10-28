@@ -8,8 +8,11 @@ from collections import defaultdict, deque
 from datetime import UTC, datetime
 
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
+from app.services.auth_service import AuthError, authenticate_request, cookie_name, csrf_token
 
 # Explicitly reviewed read routes only: future routes are private by default.
 PUBLIC_READ = re.compile(
@@ -84,6 +87,15 @@ class SecurityMiddleware:
                 status_code=status,
                 headers={"Retry-After": "60"} if status == 429 else None,
             )
+            response.headers["Cache-Control"] = "no-store"
+            if status == 401 and settings.auth_enabled:
+                response.delete_cookie(
+                    cookie_name(settings),
+                    path="/",
+                    httponly=True,
+                    secure=settings.environment == "production",
+                    samesite="strict",
+                )
             await response(scope, receive, send)
 
         if settings.environment == "production":
@@ -92,8 +104,20 @@ class SecurityMiddleware:
                 return await reject(400, "invalid_host")
             if path in {"/docs", "/redoc", "/openapi.json", "/"}:
                 return await reject(404, "not_found")
-            expected = ("Bearer " + settings.operator_token.get_secret_value()).encode("utf-8")
-            operator = secrets.compare_digest(headers.get(b"authorization", b""), expected)
+        if settings.auth_enabled:
+            login_path = path == "/api/v1/auth/login" and method == "POST"
+            if login_path:
+                if self.admit(settings, "login", settings.auth_login_requests_per_minute):
+                    return await reject(429, "login_rate_limit")
+            principal = None
+            if not login_path:
+                try:
+                    principal = await run_in_threadpool(authenticate_request, scope, settings)
+                except AuthError:
+                    return await reject(401, "authentication_required")
+                except SQLAlchemyError:
+                    return await reject(503, "authentication_unavailable")
+            scope.setdefault("state", {})["principal"] = principal
             health = method == "GET" and path in {
                 "/api/v1/health",
                 "/api/v1/ready",
@@ -101,16 +125,54 @@ class SecurityMiddleware:
             }
             public = (
                 settings.public_demo_enabled
+                and principal is None
                 and (
                     (method == "GET" and PUBLIC_READ.fullmatch(path) is not None)
                     or (method == "POST" and path == DEMO_CHAT and settings.demo_ai_enabled)
                 )
-                and not operator
             )
-            if not (operator or health or public):
-                return await reject(401, "operator_authentication_required")
+            if not (principal or health or public or login_path):
+                return await reject(401, "authentication_required")
+            state_change = method not in {"GET", "HEAD", "OPTIONS"}
+            if login_path or (principal and state_change):
+                origin = headers.get(b"origin", b"").decode("latin1")
+                if origin not in settings.auth_allowed_origins:
+                    return await reject(403, "csrf_origin_denied")
+                if login_path:
+                    if headers.get(b"x-requested-with") != b"AIProductDemandAnalyzer":
+                        return await reject(403, "csrf_header_required")
+                elif not secrets.compare_digest(
+                    headers.get(b"x-csrf-token", b""),
+                    csrf_token(settings, principal.session_id).encode(),
+                ):
+                    return await reject(403, "csrf_token_invalid")
+            if principal:
+                viewer_read = method in {"GET", "HEAD"} and (
+                    PUBLIC_READ.fullmatch(path) is not None
+                    or path in {"/api/v1/auth/me", "/api/v1/assistant/ready"}
+                )
+                viewer_post = method == "POST" and path in {
+                    "/api/v1/auth/logout",
+                    "/api/v1/assistant/chat",
+                    "/api/v1/forecasts/evaluate",
+                    "/api/v1/forecasts/backtest",
+                    DEMO_CHAT,
+                }
+                admin_write = (
+                    principal.role == "admin"
+                    and method == "POST"
+                    and path in {"/api/v1/ingestion/sales", "/api/v1/forecasts"}
+                )
+                admin_read = principal.role == "admin" and method in {"GET", "HEAD"}
+                if not (
+                    health or login_path or viewer_read or viewer_post or admin_write or admin_read
+                ):
+                    return await reject(403, "authorization_denied")
             scope.setdefault("state", {})["public_demo"] = public
-            if path == "/api/v1/ready" and not operator:
+            # Logged-in viewers in public-demo deployments remain on synthetic data.
+            if settings.public_demo_enabled and principal and principal.role == "viewer":
+                scope["state"]["public_demo"] = True
+            if path == "/api/v1/ready" and not principal:
                 if self.admit(settings, "readiness", 60):
                     return await reject(429, "readiness_rate_limit")
             if public:
@@ -135,11 +197,11 @@ class SecurityMiddleware:
                 if reason:
                     return await reject(429, "ai_" + reason)
         # Enforce bounds before multipart parsing or any database work.
-        limit = (
-            min(settings.max_request_bytes, 1024)
-            if path == DEMO_CHAT
-            else settings.max_request_bytes
-        )
+        limit = settings.max_request_bytes
+        if path == DEMO_CHAT:
+            limit = min(limit, 1024)
+        elif path == "/api/v1/auth/login":
+            limit = min(limit, 4096)
         body = bytearray()
         while True:
             message = await receive()
@@ -159,4 +221,17 @@ class SecurityMiddleware:
                 return {"type": "http.request", "body": bytes(body), "more_body": False}
             return await receive()
 
-        await self.app(scope, bounded_receive, send)
+        async def secure_send(message):
+            if settings.auth_enabled and message["type"] == "http.response.start":
+                response_headers = [
+                    (k, v)
+                    for k, v in message.get("headers", [])
+                    if k.lower() not in {b"cache-control", b"pragma"}
+                ]
+                message["headers"] = response_headers + [
+                    (b"cache-control", b"no-store"),
+                    (b"pragma", b"no-cache"),
+                ]
+            await send(message)
+
+        await self.app(scope, bounded_receive, secure_send)

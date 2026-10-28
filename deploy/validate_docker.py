@@ -45,7 +45,8 @@ def main():
         "MIGRATION_DATABASE_URL": f"postgresql+psycopg://phase7b_owner:{owner_password}@db:5432/phase7b_demo",
         "DEMO_DATABASE_URL": f"postgresql+psycopg://demand_demo_reader:{reader_password}@db:5432/phase7b_demo",
         "TRUSTED_HOSTS": '["localhost","127.0.0.1","backend"]',
-        "OPERATOR_TOKEN": token,
+        "JWT_SIGNING_SECRET": token,
+        "AUTH_ALLOWED_ORIGINS": json.dumps([f"https://localhost:{port}"]),
         "PUBLIC_DEMO_ENABLED": "true",
         "AI_ENABLED": "false",
         "DEMO_AI_ENABLED": "false",
@@ -80,6 +81,9 @@ def main():
         "-f",
         str(overlay),
     ]
+    test_password = secrets.token_urlsafe(32)
+    admin_email = "admin-" + secrets.token_hex(4) + "@example.invalid"
+    viewer_email = "viewer-" + secrets.token_hex(4) + "@example.invalid"
     owned = False
 
     def run(args, *, input=None):
@@ -89,7 +93,13 @@ def main():
         )
         if result.returncode:
             error = result.stderr.decode(errors="replace")[-6000:]
-            for secret in (password, reader_password, owner_password, token):
+            for secret in (
+                password,
+                reader_password,
+                owner_password,
+                token,
+                test_password,
+            ):
                 error = error.replace(secret, "[REDACTED]")
             raise RuntimeError(f"Command {args[0]} failed: {error}")
         return result.stdout
@@ -118,7 +128,7 @@ def main():
             .strip()
         )
 
-    def request(path, expected=200, data=None, headers=None):
+    def request(path, expected=200, data=None, headers=None, return_headers=False):
         req = urllib.request.Request(
             f"https://127.0.0.1:{port}{path}",
             data=data,
@@ -130,7 +140,8 @@ def main():
                 req, context=ssl._create_unverified_context(), timeout=15
             ) as response:
                 assert response.status == expected
-                return response.read()
+                body = response.read()
+                return (body, response.headers) if return_headers else body
         except urllib.error.HTTPError as error:
             assert error.code == expected, (path, error.code, expected)
             return error.read()
@@ -193,7 +204,7 @@ def main():
             "-m",
             "scripts.seed_demo",
         )
-        assert sql("SELECT version_num FROM alembic_version") == "0001_initial"
+        assert sql("SELECT version_num FROM alembic_version") == "0002_authentication"
         assert sql("SELECT count(*) FROM sales_history") == "364"
         assert sql("SELECT count(*) FROM product_forecasts") == "28"
         print("PASS: PostgreSQL initialization, migration and synthetic seed")
@@ -240,9 +251,38 @@ def main():
         ):
             request(path, 401, data=b"{}", headers={"Content-Type": "application/json"})
         request("/api/v1/not-reviewed", 401)
-        request(
-            "/api/v1/assistant/ready", 503, headers={"Authorization": "Bearer " + token}
+        for role, email in (("admin", admin_email), ("viewer", viewer_email)):
+            compose(
+                "run",
+                "--rm",
+                "migrate",
+                "python",
+                "-m",
+                "scripts.manage_users",
+                "create",
+                "--email",
+                email,
+                "--role",
+                role,
+                "--password-stdin",
+                input=(test_password + "\n").encode(),
+            )
+        payload, login_headers = request(
+            "/api/v1/auth/login",
+            data=json.dumps({"email": admin_email, "password": test_password}).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Origin": f"https://localhost:{port}",
+                "X-Requested-With": "AIProductDemandAnalyzer",
+            },
+            return_headers=True,
         )
+        from http.cookies import SimpleCookie
+
+        cookies = SimpleCookie()
+        cookies.load(login_headers["Set-Cookie"])
+        cookie = "; ".join(f"{key}={value.value}" for key, value in cookies.items())
+        request("/api/v1/assistant/ready", 503, headers={"Cookie": cookie})
         print("PASS: internal TLS, static hosting, proxy routes, auth and disabled AI")
         # Prove the demo reader cannot mutate data and the runtime cannot create schema.
         for role in ("demand_demo_reader", "demand_app"):
@@ -260,6 +300,27 @@ def main():
             == "f"
         )
         assert sql("SELECT has_schema_privilege('demand_app','public','CREATE')") == "f"
+        assert (
+            sql(
+                "SELECT has_table_privilege('demand_demo_reader','auth_users','SELECT')"
+            )
+            == "f"
+        )
+        assert (
+            sql(
+                "SELECT has_table_privilege('demand_demo_reader','auth_sessions','SELECT')"
+            )
+            == "f"
+        )
+        assert (
+            sql("SELECT has_table_privilege('demand_app','auth_users','INSERT')") == "f"
+        )
+        assert (
+            sql(
+                "SELECT has_column_privilege('demand_app','auth_users','role','UPDATE')"
+            )
+            == "f"
+        )
         # Exercise the real backup/restore scripts, targeting ONLY this random project.
         env.update(
             COMPOSE_ENV_FILE=str(env_file),
@@ -281,11 +342,19 @@ def main():
                 f"SELECT count(*) FROM {table}", "phase7b_restore_demo"
             )
         sql(
-            "GRANT SELECT ON ALL TABLES IN SCHEMA public TO demand_demo_reader",
+            "GRANT SELECT ON stores, products, sales_history, inventory, forecast_runs, "
+            "forecast_run_logs, product_forecasts, stock_recommendations TO demand_demo_reader",
             "phase7b_restore_demo",
         )
         sql(
             "COMMENT ON DATABASE phase7b_restore_demo IS 'AIProductDemandAnalyzer synthetic-v1'",
+            "phase7b_restore_demo",
+        )
+        sql(
+            "REVOKE ALL ON auth_users, auth_sessions FROM demand_demo_reader; "
+            "REVOKE ALL ON auth_users FROM demand_app; "
+            "GRANT SELECT ON auth_users TO demand_app; "
+            "GRANT UPDATE(password_hash) ON auth_users TO demand_app",
             "phase7b_restore_demo",
         )
         restored = values["DEMO_DATABASE_URL"].replace(
@@ -343,6 +412,14 @@ def main():
             )
             run(["npm", "--prefix", "ui", "run", "e2e", "--", "public-demo.spec.ts"])
             print("PASS: production public-demo Playwright browser checks")
+            env.update(
+                E2E_AUTH="1",
+                E2E_ADMIN_EMAIL=admin_email,
+                E2E_VIEWER_EMAIL=viewer_email,
+                E2E_AUTH_PASSWORD=test_password,
+            )
+            run(["npm", "--prefix", "ui", "run", "e2e", "--", "authentication.spec.ts"])
+            print("PASS: production JWT authentication browser checks")
         # No destructive commands until all ownership checks below succeed.
         print(
             "Docker integration validation completed; disposable stack will be removed"

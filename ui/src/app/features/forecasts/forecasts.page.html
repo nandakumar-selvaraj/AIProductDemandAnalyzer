@@ -46,10 +46,10 @@
         </p>
       }
     </section>
-    @if (!demo.readOnly) {
+    @if (demo.canWrite) {
       <app-create-forecast (created)="onCreated($event)" />
     } @else {
-      <p class="panel">Read-only demonstration. Forecast creation and backtesting are reserved for the operator.</p>
+      <p class="panel">Read-only demonstration. Forecast creation is reserved for administrators.</p>
     }
   </div>
   <app-run-history [selectedId]="selected()?.id ?? null" (runSelected)="selectRun($event)" />

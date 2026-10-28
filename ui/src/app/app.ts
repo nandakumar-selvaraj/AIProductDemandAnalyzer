@@ -14,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { AuthService } from './core/services/auth.service';
 import { DemoService } from './core/services/demo.service';
 
 @Component({
@@ -23,6 +24,9 @@ import { DemoService } from './core/services/demo.service';
   templateUrl: './app.html',
 })
 export class App {
+  protected readonly auth = inject(AuthService);
+  protected readonly loginPage = computed(() => this.currentUrl() === '/login');
+  protected readonly publicDemo = computed(() => this.currentUrl().startsWith('/demo'));
   protected readonly demo = inject(DemoService);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
@@ -37,7 +41,7 @@ export class App {
   );
   private readonly currentUrl = signal('');
   protected readonly pageTitle = computed(
-    () => this.navigation.find((item) => item.path === this.currentUrl())?.label ?? 'Dashboard',
+    () => this.navigation.find((item) => item.path === (this.currentUrl().replace(/^\/demo(?=\/|$)/, '') || '/dashboard'))?.label ?? 'Dashboard',
   );
   protected readonly navigation = [
     { label: 'Dashboard', path: '/dashboard', icon: '▦' },
@@ -70,6 +74,10 @@ export class App {
         this.currentUrl.set(event.urlAfterRedirects.split(/[?#]/)[0]);
         this.closeNavigation();
       });
+  }
+
+  protected navPath(path: string): string {
+    return this.publicDemo() ? (path === '/dashboard' ? '/demo' : '/demo' + path) : path;
   }
 
   protected toggleSidebar(): void {

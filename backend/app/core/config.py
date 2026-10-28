@@ -3,6 +3,7 @@
 from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, HttpUrl, PostgresDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +14,14 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: PostgresDsn
     log_level: str = "INFO"
+    auth_enabled: bool = False
+    jwt_signing_secret: SecretStr = SecretStr("")
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_issuer: str = "ai-product-demand-analyzer"
+    jwt_audience: str = "demand-analyzer-browser"
+    auth_access_token_minutes: int = Field(default=30, ge=1, le=120)
+    auth_allowed_origins: list[str] = ["http://localhost:4200", "http://127.0.0.1:4200"]
+    auth_login_requests_per_minute: int = Field(default=10, ge=1, le=30)
     operator_token: SecretStr = SecretStr("")
     trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
     public_demo_enabled: bool = False
@@ -62,8 +71,12 @@ class Settings(BaseSettings):
         if self.environment not in {"development", "test", "production"}:
             raise ValueError("Unknown ENVIRONMENT")
         if self.environment == "production":
-            if len(self.operator_token.get_secret_value()) < 32:
-                raise ValueError("Production requires an OPERATOR_TOKEN of at least 32 characters")
+            if not self.auth_enabled:
+                raise ValueError("Production requires AUTH_ENABLED=true")
+            if not self.auth_allowed_origins or any(
+                not origin.startswith("https://") for origin in self.auth_allowed_origins
+            ):
+                raise ValueError("Production requires explicit HTTPS AUTH_ALLOWED_ORIGINS")
             if not self.trusted_hosts or "*" in self.trusted_hosts:
                 raise ValueError("Production requires explicit TRUSTED_HOSTS")
             if self.ai_enabled and self.ai_provider != "openai":
@@ -76,6 +89,24 @@ class Settings(BaseSettings):
                 raise ValueError("Hosted inference requires AI_API_KEY")
             if self.ai_base_url.scheme != "https":
                 raise ValueError("Hosted inference requires HTTPS")
+        if self.auth_enabled:
+            if len(self.jwt_signing_secret.get_secret_value()) < 64:
+                raise ValueError("JWT_SIGNING_SECRET requires at least 64 random characters")
+            if not self.jwt_issuer or not self.jwt_audience:
+                raise ValueError("JWT issuer and audience must be nonempty")
+            for origin in self.auth_allowed_origins:
+                parsed = urlsplit(origin)
+                if (
+                    parsed.scheme not in {"http", "https"}
+                    or not parsed.hostname
+                    or parsed.username
+                    or parsed.password
+                    or parsed.path
+                    or parsed.query
+                    or parsed.fragment
+                    or "*" in origin
+                ):
+                    raise ValueError("Auth origins must be exact scheme/host/port origins")
         if self.public_demo_enabled:
             if self.environment != "production" or self.demo_database_url is None:
                 raise ValueError("Public demo requires production and a separate demo reader URL")

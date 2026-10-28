@@ -25,11 +25,18 @@ provider settings in an encrypted password manager. Caddy can renew certificates
 After restoring, grant runtime rights using the owner in the restored DB:
 
 ```sql
-GRANT USAGE ON SCHEMA public TO demand_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO demand_app;
+GRANT USAGE ON SCHEMA public TO demand_app, demand_demo_reader;
+GRANT SELECT, INSERT, UPDATE, DELETE ON stores, products, sales_history, inventory,
+  forecast_runs, forecast_run_logs, product_forecasts, stock_recommendations TO demand_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demand_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO demand_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO demand_app;
+GRANT SELECT ON stores, products, sales_history, inventory, forecast_runs,
+  forecast_run_logs, product_forecasts, stock_recommendations TO demand_demo_reader;
+REVOKE ALL ON auth_users, auth_sessions FROM demand_demo_reader;
+REVOKE ALL ON auth_users FROM demand_app;
+GRANT SELECT ON auth_users TO demand_app;
+GRANT UPDATE(password_hash) ON auth_users TO demand_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON auth_sessions TO demand_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM demand_demo_reader;
 ```
 
 Verify Alembic revision, row counts, latest forecast/reports and `/api/v1/ready` using
@@ -58,3 +65,11 @@ reading or changing production configuration. Dump and env files must not be upl
 as CI artifacts. A restored public demo requires SELECT grants for demand_demo_reader
 and the synthetic-v1 database marker after verification; retain normal runtime grants
 above for operator connectivity. Never mark a private database as a demo.
+
+
+Auth tables contain password hashes and revocation state and are part of the database
+backup. Encrypt them off-host and restrict access. JWT signing keys remain separate
+server secrets and are not in the DB dump. A restore can reintroduce previously active
+session rows from the snapshot: rotate the signing key on disaster recovery to invalidate
+all old JWTs and require a new login. Reapply the explicit ACLs above after `--no-acl`
+restores. Never grant the demo reader SELECT on auth tables or future tables by default.

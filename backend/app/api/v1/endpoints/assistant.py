@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
@@ -66,8 +66,14 @@ async def chat(
     completed = False
     started = time.monotonic()
     try:
+        principal = getattr(getattr(http_request, "state", None), "principal", None)
+        owner = (
+            uuid5(NAMESPACE_URL, f"{principal.id}:{principal.session_id}:{x_assistant_session}")
+            if principal
+            else x_assistant_session
+        )
         conversation_id, conversation = conversations.begin(
-            x_assistant_session,
+            owner,
             request.conversation_id,
             settings.ai_conversation_ttl_seconds,
             settings.ai_max_conversations,

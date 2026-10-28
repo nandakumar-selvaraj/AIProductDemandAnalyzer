@@ -98,7 +98,7 @@ async def root() -> RedirectResponse:
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={
@@ -108,6 +108,7 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
                 "details": (
                     None
                     if get_settings().environment == "production"
+                    or request.url.path.startswith("/api/v1/auth/")
                     else jsonable_encoder(exc.errors(), custom_encoder={ValueError: str})
                 ),
             }

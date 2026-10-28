@@ -1,3 +1,7 @@
+@if (auth.enabled && !auth.user() && !publicDemo()) {
+  @if (loginPage()) { <router-outlet /> }
+  @else { <p role="status">Checking session…</p> }
+} @else {
 <div
   class="app-shell"
   [class.sidebar-collapsed]="sidebarCollapsed()"
@@ -27,7 +31,7 @@
         ×
       </button>
     }
-    <a class="brand" routerLink="/dashboard" aria-label="AI Product Demand Analyzer home"
+    <a class="brand" [routerLink]="navPath('/dashboard')" aria-label="AI Product Demand Analyzer home"
       ><span class="brand-mark" aria-hidden="true">A</span><span class="brand-name">AI Product</span
       ><span class="brand-caption">DEMAND ANALYZER</span></a
     >
@@ -36,7 +40,7 @@
       @for (item of navigation; track item.path) {
         <a
           class="nav-link"
-          [routerLink]="item.path"
+          [routerLink]="navPath(item.path)"
           routerLinkActive="active"
           ariaCurrentWhenActive="page"
           [attr.aria-label]="item.label"
@@ -74,15 +78,24 @@
       <div class="topbar-context">
         <span>Workspace</span><span class="crumb-divider">/</span><strong>{{ pageTitle() }}</strong>
       </div>
-      <div class="topbar-right"><div class="avatar" aria-label="Workspace profile">AD</div></div>
+      <div class="topbar-right">
+        @if (auth.user(); as user) {
+          <span>{{ user.email }} · {{ user.role }}</span>
+          <button type="button" class="btn btn-outline-primary" (click)="auth.logout()">Log out</button>
+        }
+        <div class="avatar" aria-label="Workspace profile">AD</div>
+      </div>
     </header>
     <main id="main-content" class="content-area" tabindex="-1">@if (demo.readOnly) {
       <p class="alert alert-info" role="status">{{ demo.config()?.enabled
         ? demo.config()?.label : 'Read-only preview — operator actions are unavailable here' }}</p>
     }
+    @if (auth.logoutError()) { <p role="alert">{{ auth.logoutError() }}</p> }
     <router-outlet /></main>
     <footer class="app-footer">
       <span>AI Product Demand Analyzer</span><span>Demand planning workspace</span>
     </footer>
   </div>
 </div>
+
+}
