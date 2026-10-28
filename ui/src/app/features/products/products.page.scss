@@ -205,3 +205,25 @@ h1 {
     gap: 0.7rem;
   }
 }
+.catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.catalog-toolbar .search-row {
+  flex: 1 1 280px;
+  margin-bottom: 0;
+}
+.page-size-control {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #637088;
+  margin-left: auto;
+}
+.page-size-control select {
+  width: auto;
+  min-width: 5rem;
+}

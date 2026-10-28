@@ -9,21 +9,36 @@
   }
 </section>
 <section class="panel" [attr.aria-busy]="loading()">
-  <form class="search-row" (submit)="submitSearch($event)">
-    <label class="search-box">
-      <span aria-hidden="true">⌕</span>
-      <input
-        type="search"
-        aria-label="Search products"
-        placeholder="Search by name or item code…"
-        [ngModel]="search()"
-        (ngModelChange)="search.set($event)"
-        name="search"
-        maxlength="100"
-      />
+  <div class="catalog-toolbar">
+    <form class="search-row" (submit)="submitSearch($event)">
+      <label class="search-box">
+        <span aria-hidden="true">⌕</span>
+        <input
+          type="search"
+          aria-label="Search products"
+          placeholder="Search by name or item code…"
+          [ngModel]="search()"
+          (ngModelChange)="search.set($event)"
+          name="search"
+          maxlength="100"
+        />
+      </label>
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+    <label class="page-size-control" for="products-page-size">
+      Items per page
+      <select
+        id="products-page-size"
+        class="form-select"
+        [ngModel]="pageSize()"
+        (ngModelChange)="changePageSize($event)"
+      >
+        @for (size of pageSizes; track size) {
+          <option [ngValue]="size">{{ size }}</option>
+        }
+      </select>
     </label>
-    <button class="btn btn-primary" type="submit">Search</button>
-  </form>
+  </div>
   @if (error(); as message) {
     <c-alert color="danger" role="alert">
       <strong>Catalog unavailable.</strong> {{ message }}

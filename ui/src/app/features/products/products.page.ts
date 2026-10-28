@@ -19,17 +19,20 @@ export class ProductsPage {
   protected readonly search = signal('');
   protected readonly submittedSearch = signal('');
   protected readonly page = signal(1);
+  protected readonly pageSize = signal(10);
+  protected readonly pageSizes = [10, 25, 50];
   protected readonly totalPages = signal(0);
   protected readonly totalRecords = signal(0);
-  private readonly query = new BehaviorSubject({ page: 1, search: '' });
+  private readonly query = new BehaviorSubject({ page: 1, pageSize: 10, search: '' });
 
   constructor() {
     this.query
       .pipe(
         switchMap((query) => {
           this.page.set(query.page);
+          this.pageSize.set(query.pageSize);
           this.submittedSearch.set(query.search);
-          return this.api.getProducts(query.page, 10, query.search).pipe(
+          return this.api.getProducts(query.page, query.pageSize, query.search).pipe(
             map((result) => ({ status: 'success', result }) as const),
             catchError((error: unknown) =>
               of({
@@ -60,11 +63,16 @@ export class ProductsPage {
 
   protected changePage(page: number): void {
     if (this.loading() || page < 1 || page > this.totalPages()) return;
-    this.query.next({ page, search: this.submittedSearch() });
+    this.query.next({ ...this.query.value, page });
+  }
+
+  protected changePageSize(pageSize: number): void {
+    if (!this.pageSizes.includes(pageSize) || pageSize === this.pageSize()) return;
+    this.query.next({ ...this.query.value, page: 1, pageSize });
   }
 
   protected submitSearch(event: Event): void {
     event.preventDefault();
-    this.query.next({ page: 1, search: this.search().trim() });
+    this.query.next({ ...this.query.value, page: 1, search: this.search().trim() });
   }
 }

@@ -21,14 +21,14 @@ describe('ProductsPage', () => {
   let root: HTMLElement;
   let http: HttpTestingController;
 
-  function request(page = 1, search = '') {
+  function request(page = 1, search = '', pageSize = 10) {
     const pending = http.expectOne(
       (req) =>
         req.url === `${environment.apiBaseUrl}/products` &&
         req.params.get('page') === String(page) &&
         (req.params.get('search') ?? '') === search,
     );
-    expect(pending.request.params.get('page_size')).toBe('10');
+    expect(pending.request.params.get('page_size')).toBe(String(pageSize));
     return pending;
   }
 
@@ -214,6 +214,32 @@ describe('ProductsPage', () => {
     request().flush(catalog());
     fixture.detectChanges();
     expect(root.querySelector('table')).not.toBeNull();
+  });
+
+  it('resets to page one and cancels the old request when page size changes', () => {
+    request().flush(catalog());
+    fixture.detectChanges();
+    click('Next');
+    const older = request(2);
+    const select = root.querySelector<HTMLSelectElement>('#products-page-size')!;
+    expect(Array.from(select.options, (option) => option.textContent?.trim())).toEqual([
+      '10',
+      '25',
+      '50',
+    ]);
+    select.selectedIndex = 1;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+    expect(older.cancelled).toBe(true);
+    const medium = request(1, '', 25);
+    select.selectedIndex = 2;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges();
+    expect(medium.cancelled).toBe(true);
+    request(1, '', 50).flush({ ...catalog(), page_size: 50 });
+    fixture.detectChanges();
+    click('Next');
+    request(2, '', 50).flush({ ...catalog(2), page_size: 50 });
   });
 
   it('cancels the active request on component destruction', () => {
