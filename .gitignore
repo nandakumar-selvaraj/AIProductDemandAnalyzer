@@ -72,3 +72,8 @@ coverage.xml
 .vs/
 .DS_Store
 Thumbs.db
+
+!.env.production.example
+/backups/
+
+/validation-migration.sql

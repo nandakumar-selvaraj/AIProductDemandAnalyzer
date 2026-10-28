@@ -14,7 +14,12 @@ from app.core.config import get_settings
 def get_engine() -> Engine:
     """Create the pooled engine lazily; importing the app does not connect."""
     return create_engine(
-        str(get_settings().database_url), pool_pre_ping=True, pool_size=5, max_overflow=10
+        str(get_settings().database_url),
+        pool_pre_ping=True,
+        pool_size=2,
+        max_overflow=2,
+        pool_timeout=10,
+        connect_args={"options": "-c statement_timeout=30000"},
     )
 
 

@@ -81,7 +81,10 @@ class OllamaProvider:
         async with self.gate:
             try:
                 async with asyncio.timeout(self.settings.ai_timeout_seconds):
-                    if self.settings.ai_ollama_transport == "openai":
+                    if (
+                        self.settings.ai_provider == "ollama"
+                        and self.settings.ai_ollama_transport == "openai"
+                    ):
                         content = await self._compatible(payload)
                     else:
                         content = await self._native(payload)
@@ -198,6 +201,58 @@ class OllamaProvider:
         return data["message"]["content"]
 
 
+class HostedProvider(OllamaProvider):
+    """OpenAI-compatible inference; no retries or automatic provider fallback."""
+
+    async def ready(self) -> bool:
+        try:
+            async with self._http(5) as client:
+                response = await client.get(f"{str(self.settings.ai_base_url).rstrip('/')}/models")
+                response.raise_for_status()
+                return any(
+                    row.get("id") == self.settings.ai_model for row in response.json()["data"]
+                )
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return False
+
+    async def _native(self, payload: dict) -> str:
+        url = f"{str(self.settings.ai_base_url).rstrip('/')}/chat/completions"
+        async with self._http(self.settings.ai_timeout_seconds) as client:
+            async with client.stream(
+                "POST",
+                url,
+                json={
+                    "model": self.settings.ai_model,
+                    "messages": self._messages(payload),
+                    "temperature": self.settings.ai_temperature,
+                    "max_tokens": self.settings.ai_max_output_tokens,
+                    "stream": False,
+                    "response_format": {"type": "json_object"},
+                },
+            ) as response:
+                if response.is_error:
+                    await response.aread()
+                response.raise_for_status()
+                raw = bytearray()
+                async for chunk in response.aiter_bytes():
+                    raw.extend(chunk)
+                    if len(raw) > 65536:
+                        raise ValueError("Oversized response")
+                choice = json.loads(raw)["choices"][0]
+                if choice["finish_reason"] != "stop":
+                    raise ValueError("Truncated response")
+                return choice["message"]["content"]
+
+    async def select_evidence(self, payload: dict) -> ModelSelection:
+        try:
+            return await super().select_evidence(payload)
+        except ProviderError as exc:
+            raise ProviderError(
+                exc.code, "Hosted AI request failed; try again later.", exc.status
+            ) from exc
+
+
 @lru_cache
 def get_ai_provider() -> AIProvider:
-    return OllamaProvider(get_settings())
+    settings = get_settings()
+    return (HostedProvider if settings.ai_provider == "openai" else OllamaProvider)(settings)

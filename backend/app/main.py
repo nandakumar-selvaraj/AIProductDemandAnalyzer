@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -8,11 +9,22 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.v1.router import api_router
+from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.security import SecurityMiddleware
 
 logger = logging.getLogger(__name__)
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_settings()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="AI Product Demand Analyzer API",
     description=(
         "Backend API for importing and summarizing historical product sales and checking "
@@ -21,7 +33,7 @@ app = FastAPI(
         "pagination and evaluated against matching actual sales. Demand-trend recommendations "
         "are available from persisted forecasts and sales history. Catalog, product analytics, "
         "dashboard and historical backtest endpoints support the reporting workflow. "
-        "Authentication is not implemented in this version."
+        "Production sensitive operations require operator authentication."
     ),
     version="0.1.0",
     docs_url="/docs",
@@ -70,6 +82,7 @@ app = FastAPI(
     ],
 )
 app.include_router(api_router, prefix="/api/v1")
+app.add_middleware(SecurityMiddleware)
 
 
 @app.get("/", include_in_schema=False)
@@ -86,7 +99,11 @@ async def validation_error_handler(_: Request, exc: RequestValidationError) -> J
             "error": {
                 "code": "request_validation_error",
                 "message": "Request validation failed",
-                "details": jsonable_encoder(exc.errors(), custom_encoder={ValueError: str}),
+                "details": (
+                    None
+                    if get_settings().environment == "production"
+                    else jsonable_encoder(exc.errors(), custom_encoder={ValueError: str})
+                ),
             }
         },
     )

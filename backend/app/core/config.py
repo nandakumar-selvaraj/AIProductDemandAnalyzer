@@ -13,11 +13,17 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: PostgresDsn
     log_level: str = "INFO"
+    operator_token: SecretStr = SecretStr("")
+    trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
+    max_request_bytes: int = Field(default=26 * 1024 * 1024, gt=0)
+    ai_usage_file: str = ""
+    ai_requests_per_minute: int = Field(default=10, ge=1, le=100)
+    ai_daily_request_cap: int = Field(default=100, ge=1, le=10000)
     max_upload_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
     recommendation_increase_threshold_percent: Decimal = Field(default=Decimal("10"), gt=0)
     recommendation_reduce_threshold_percent: Decimal = Field(default=Decimal("-10"), lt=0)
     ai_enabled: bool = False
-    ai_provider: Literal["ollama"] = "ollama"
+    ai_provider: Literal["ollama", "openai"] = "ollama"
     ai_base_url: HttpUrl | None = None
     ai_model: str = Field(default="", max_length=500)
     ai_api_key: SecretStr = SecretStr("ollama")
@@ -47,6 +53,23 @@ class Settings(BaseSettings):
             raise ValueError("Use AI_API_KEY instead of credentials in AI_BASE_URL")
         if self.ai_base_url and not self.ai_base_url.path.rstrip("/").endswith("/v1"):
             raise ValueError("AI_BASE_URL must end in /v1")
+        if self.environment not in {"development", "test", "production"}:
+            raise ValueError("Unknown ENVIRONMENT")
+        if self.environment == "production":
+            if len(self.operator_token.get_secret_value()) < 32:
+                raise ValueError("Production requires an OPERATOR_TOKEN of at least 32 characters")
+            if not self.trusted_hosts or "*" in self.trusted_hosts:
+                raise ValueError("Production requires explicit TRUSTED_HOSTS")
+            if self.ai_enabled and self.ai_provider != "openai":
+                raise ValueError("Production AI requires hosted inference")
+        if self.ai_enabled and self.ai_provider == "openai":
+            if (
+                not self.ai_api_key.get_secret_value()
+                or self.ai_api_key.get_secret_value() == "ollama"
+            ):
+                raise ValueError("Hosted inference requires AI_API_KEY")
+            if self.ai_base_url.scheme != "https":
+                raise ValueError("Hosted inference requires HTTPS")
         return self
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
