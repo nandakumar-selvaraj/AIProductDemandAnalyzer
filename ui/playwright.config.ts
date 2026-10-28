@@ -16,6 +16,7 @@ export default defineConfig({
   outputDir: 'test-results',
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
+    ignoreHTTPSErrors: process.env['E2E_PUBLIC_DEMO'] === '1',
     baseURL: process.env['E2E_BASE_URL'] ?? 'http://localhost:4200',
     viewport: { width: 1440, height: 1000 },
     screenshot: capture ? 'only-on-failure' : 'off',

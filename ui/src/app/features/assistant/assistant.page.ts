@@ -23,15 +23,18 @@ import { AssistantApiService } from '../../core/services/assistant-api.service';
 import { ForecastApiService } from '../../core/services/forecast-api.service';
 import { validateFilters } from '../demand-analysis/demand-analysis.helpers';
 import { LoadState, requestState } from '../forecasts/forecast.helpers';
+import { DemoService } from '../../core/services/demo.service';
+import { PublicAssistantComponent } from './public-assistant.component';
 import { ChatMessageComponent } from './chat-message.component';
 
 @Component({
   selector: 'app-assistant-page',
-  imports: [FormsModule, AlertComponent, SpinnerComponent, ChatMessageComponent],
+  imports: [FormsModule, AlertComponent, SpinnerComponent, ChatMessageComponent, PublicAssistantComponent],
   templateUrl: './assistant.page.html',
   styleUrl: './assistant.page.scss',
 })
 export class AssistantPage {
+  protected readonly demo = inject(DemoService);
   private readonly injector = inject(Injector);
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
   private readonly transcript = viewChild<ElementRef<HTMLElement>>('transcript');
@@ -71,6 +74,7 @@ export class AssistantPage {
     'How are demand recommendations calculated?',
   ];
   constructor() {
+    if (this.demo.readOnly) return;
     this.requests
       .pipe(
         switchMap((request) =>

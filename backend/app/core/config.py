@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     operator_token: SecretStr = SecretStr("")
     trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
+    public_demo_enabled: bool = False
+    demo_database_url: PostgresDsn | None = None
+    demo_ai_enabled: bool = False
+    demo_reads_per_minute: int = Field(default=120, ge=1, le=1000)
+    demo_ai_requests_per_minute: int = Field(default=3, ge=1, le=10)
+    demo_ai_daily_cap: int = Field(default=10, ge=1, le=100)
     max_request_bytes: int = Field(default=26 * 1024 * 1024, gt=0)
     ai_usage_file: str = ""
     ai_requests_per_minute: int = Field(default=10, ge=1, le=100)
@@ -40,7 +46,7 @@ class Settings(BaseSettings):
     ai_max_conversations: int = Field(default=128, ge=1, le=1000)
     ai_max_concurrent_requests: int = Field(default=1, ge=1, le=8)
 
-    @field_validator("ai_base_url", mode="before")
+    @field_validator("ai_base_url", "demo_database_url", mode="before")
     @classmethod
     def empty_ai_url(cls, value):
         return None if value == "" else value
@@ -70,6 +76,20 @@ class Settings(BaseSettings):
                 raise ValueError("Hosted inference requires AI_API_KEY")
             if self.ai_base_url.scheme != "https":
                 raise ValueError("Hosted inference requires HTTPS")
+        if self.public_demo_enabled:
+            if self.environment != "production" or self.demo_database_url is None:
+                raise ValueError("Public demo requires production and a separate demo reader URL")
+            if (
+                len(self.demo_database_url.hosts()) != 1
+                or self.demo_database_url.hosts()[0]["username"] != "demand_demo_reader"
+            ):
+                raise ValueError("Demo URL must use the read-only demand_demo_reader role")
+            if not self.demo_database_url.path.rstrip("/").endswith("_demo"):
+                raise ValueError("Public data must use a dedicated *_demo database")
+        if self.demo_ai_enabled and not (self.public_demo_enabled and self.ai_enabled):
+            raise ValueError("Public AI requires public demo and explicitly enabled hosted AI")
+        if self.demo_ai_enabled and not self.ai_usage_file:
+            raise ValueError("Public AI requires persistent usage accounting")
         return self
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

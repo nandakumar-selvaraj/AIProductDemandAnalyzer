@@ -14,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { DemoService } from './core/services/demo.service';
 
 @Component({
   imports: [CdkTrapFocus, RouterOutlet, RouterLink, RouterLinkActive],
@@ -22,6 +23,7 @@ import { filter } from 'rxjs';
   templateUrl: './app.html',
 })
 export class App {
+  protected readonly demo = inject(DemoService);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);

@@ -38,6 +38,9 @@ export class ForecastApiService {
     });
   }
   evaluate(runId: number) {
+    if (environment.production) {
+      return this.http.get<EvaluationResult>(`${this.base}/forecasts/${runId}/evaluation`);
+    }
     return this.http.post<EvaluationResult>(`${this.base}/forecasts/evaluate`, {
       forecast_run_id: runId,
     });

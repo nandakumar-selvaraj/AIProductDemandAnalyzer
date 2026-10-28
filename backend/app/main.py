@@ -19,7 +19,13 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    get_settings()
+    settings = get_settings()
+    if settings.public_demo_enabled:
+        from starlette.concurrency import run_in_threadpool
+
+        from app.db.session import verify_demo_database
+
+        await run_in_threadpool(verify_demo_database)
     yield
 
 

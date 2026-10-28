@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     assistant,
     dashboard,
+    demo,
     forecasts,
     health,
     ingestion,
@@ -13,6 +14,7 @@ from app.api.v1.endpoints import (
 )
 
 api_router = APIRouter()
+api_router.include_router(demo.router)
 api_router.include_router(assistant.router)
 api_router.include_router(health.router)
 api_router.include_router(ingestion.router)

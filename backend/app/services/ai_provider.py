@@ -212,7 +212,7 @@ class HostedProvider(OllamaProvider):
                 return any(
                     row.get("id") == self.settings.ai_model for row in response.json()["data"]
                 )
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
             return False
 
     async def _native(self, payload: dict) -> str:

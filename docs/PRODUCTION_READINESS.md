@@ -1,4 +1,38 @@
-# Phase 7A production readiness
+# Current readiness — Phase 7B (2026-10-28)
+
+Phase 7B implementation is prepared and local application checks passed. **Production
+container validation remains pending:** Docker's Linux engine is unavailable. A new
+disposable Docker workflow covers image builds, Caddy provisioning/internal TLS,
+initialization/migrations, real backup/restore, health/resource/restart/persistence
+checks and production browser tests. A configured workflow is not a verified result.
+
+Current local evidence: 147 backend tests passed (one optional integration test skipped
+in the unit run), PostgreSQL integration separately passed in a fresh test DB, demo
+seed/marker/nonempty refusal passed in a fresh DB, 240 Angular tests passed, lint and
+production build passed, and synthetic-only Edge E2E passed 8 tests with 3 Docker-only
+tests skipped. No paid inference, cloud deployment, commit or push was performed.
+
+Public deployment now defaults private: operator authentication gates data reads unless
+public demo mode is explicitly enabled. Public demo uses a separate SELECT-only reader
+URL for a marked synthetic database, not the operator data connection. Read routes are
+allowlisted/rate-limited, writes remain private, and optional guided AI accepts only
+fixed question IDs with persistent caps. Angular labels demo data and hides production
+write/backtest controls. Free-form assistant access remains operator-only.
+
+Remaining High launch gates: run the Docker workflow green, rehearse actual restore,
+scan/pin built images, and validate public TLS/DNS in the eventual deployment. Medium:
+measure load/memory, install backup monitoring/off-host copies, approve synthetic data
+handling and shared allowance tradeoffs, and configure one shared ingress before demo
+two/three. Hosted AI remains off until provider and spending approval.
+
+See PHASE_7B_VALIDATION.md for exact commands/results and changed files,
+SHARED_VPS_ARCHITECTURE.md for the three-demo design, and DEPLOYMENT.md for setup.
+
+---
+
+## Historical Phase 7A baseline (superseded by Phase 7B above)
+
+### Phase 7A production readiness
 
 Assessment date: 2026-10-28. Preparation complete; public deployment is not yet approved
 or validated. No cloud deployment, paid inference, seed/reset, commit or push performed.

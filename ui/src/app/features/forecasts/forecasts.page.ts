@@ -13,6 +13,7 @@ import { AlertComponent, SpinnerComponent } from '@coreui/angular';
 import { startWith, Subject, switchMap } from 'rxjs';
 import { ForecastCreated, ForecastRunItem, RunContext } from '../../core/models/forecast.models';
 import { ForecastApiService } from '../../core/services/forecast-api.service';
+import { DemoService } from '../../core/services/demo.service';
 import { BacktestingComponent } from './backtesting.component';
 import { CreateForecastComponent } from './create-forecast.component';
 import { EvaluationComponent } from './evaluation.component';
@@ -39,6 +40,7 @@ import { RunOverviewComponent } from './run-overview.component';
   styleUrl: './forecast-panel.scss',
 })
 export class ForecastsPage {
+  protected readonly demo = inject(DemoService);
   private readonly api = inject(ForecastApiService);
   private readonly injector = inject(Injector);
   private readonly latestRequests = new Subject<void>();

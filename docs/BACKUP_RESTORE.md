@@ -41,3 +41,20 @@ RPO 24 hours with daily backups, RTO 1 hour; neither has been measured here.
 AI daily usage persists separately in the `ai_usage` volume. Preserve this volume across
 releases; a disaster recovery that loses it resets the app cap, so provider-side billing
 limits remain necessary. Never use `docker compose down -v` in the recovery procedure.
+
+
+## Phase 7B automation and isolation
+
+`deploy/validate_docker.py` exercises these real scripts against a fresh random project,
+compares five tables after restoring to a new database, and connects the application's
+read-only demo engine to the restored database. It also checks source counts remain
+unchanged. This is configured in `.github/workflows/docker-validation.yml`; it has not
+run locally because Docker Engine is unavailable.
+
+Scripts accept COMPOSE_ENV_FILE (default .env.production), COMPOSE_EXTRA_FILE (optional
+validation overlay), and BACKUP_DIRECTORY (backup only; default backups). Keep the same
+Compose project name throughout. These overrides enable isolated testing without
+reading or changing production configuration. Dump and env files must not be uploaded
+as CI artifacts. A restored public demo requires SELECT grants for demand_demo_reader
+and the synthetic-v1 database marker after verification; retain normal runtime grants
+above for operator connectivity. Never mark a private database as a demo.

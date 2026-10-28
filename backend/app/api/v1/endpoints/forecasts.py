@@ -220,3 +220,11 @@ def post_forecast_evaluation(
         horizon_days=run.horizon_days,
         **metrics,
     )
+
+
+@router.get("/{run_id}/evaluation", response_model=ForecastEvaluationResponse)
+def get_forecast_evaluation(
+    run_id: int = Path(..., gt=0), session: Session = Depends(get_db)
+) -> ForecastEvaluationResponse:
+    """Read-only evaluation route for the public synthetic demo."""
+    return post_forecast_evaluation(ForecastEvaluationRequest(forecast_run_id=run_id), session)

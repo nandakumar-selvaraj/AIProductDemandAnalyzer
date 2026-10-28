@@ -76,7 +76,11 @@
       </div>
       <div class="topbar-right"><div class="avatar" aria-label="Workspace profile">AD</div></div>
     </header>
-    <main id="main-content" class="content-area" tabindex="-1"><router-outlet /></main>
+    <main id="main-content" class="content-area" tabindex="-1">@if (demo.readOnly) {
+      <p class="alert alert-info" role="status">{{ demo.config()?.enabled
+        ? demo.config()?.label : 'Read-only preview — operator actions are unavailable here' }}</p>
+    }
+    <router-outlet /></main>
     <footer class="app-footer">
       <span>AI Product Demand Analyzer</span><span>Demand planning workspace</span>
     </footer>

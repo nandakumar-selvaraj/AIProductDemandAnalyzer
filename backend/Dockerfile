@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.production.txt && useradd --creat
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
+COPY scripts/seed_demo.py ./scripts/seed_demo.py
 USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=3)"

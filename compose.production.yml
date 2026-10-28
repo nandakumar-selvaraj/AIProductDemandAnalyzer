@@ -6,6 +6,12 @@ x-api: &api
     DATABASE_URL: ${DATABASE_URL:?required}
     OPERATOR_TOKEN: ${OPERATOR_TOKEN:?required}
     TRUSTED_HOSTS: ${TRUSTED_HOSTS:?required}
+    PUBLIC_DEMO_ENABLED: ${PUBLIC_DEMO_ENABLED:-false}
+    DEMO_DATABASE_URL: ${DEMO_DATABASE_URL:-}
+    DEMO_AI_ENABLED: ${DEMO_AI_ENABLED:-false}
+    DEMO_READS_PER_MINUTE: ${DEMO_READS_PER_MINUTE:-120}
+    DEMO_AI_REQUESTS_PER_MINUTE: ${DEMO_AI_REQUESTS_PER_MINUTE:-3}
+    DEMO_AI_DAILY_CAP: ${DEMO_AI_DAILY_CAP:-10}
     AI_ENABLED: ${AI_ENABLED:-false}
     AI_PROVIDER: ${AI_PROVIDER:-openai}
     AI_BASE_URL: ${AI_BASE_URL:-}
@@ -34,6 +40,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?required}
       POSTGRES_USER: ${POSTGRES_USER:?required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      DEMO_DB_PASSWORD: ${DEMO_DB_PASSWORD:?required}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?required}
     networks: [private]
     volumes:
@@ -87,6 +94,7 @@ services:
     networks: [private]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/Caddy.routes:/etc/caddy/app.routes:ro
       - certificates:/data
       - proxy_config:/config
     restart: unless-stopped

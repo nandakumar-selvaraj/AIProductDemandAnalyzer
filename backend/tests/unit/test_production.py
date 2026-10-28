@@ -74,6 +74,12 @@ def test_hosted_contract(mode):
         assert request.headers["Authorization"] == "Bearer test-secret"
         if request.method == "GET":
             return httpx.Response(200, json={"data": [{"id": "model"}]})
+        import json
+
+        body = json.loads(request.content)
+        assert body["response_format"] == {"type": "json_object"}
+        assert body["stream"] is False
+        assert body["max_tokens"] == 512
         if mode == "timeout":
             raise httpx.ReadTimeout("private credentials")
         if mode == "auth":
