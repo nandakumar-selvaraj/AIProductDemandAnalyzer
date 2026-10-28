@@ -18,6 +18,29 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def validate_compose_config(configuration):
+    """Check runtime-sensitive mounts that Compose schema validation alone accepts."""
+    expected = {
+        "backend": ["/tmp:size=64m,mode=1777"],
+        "migrate": ["/tmp:size=64m,mode=1777"],
+        "frontend": ["/tmp:size=16m"],
+    }
+    for service, mounts in expected.items():
+        definition = configuration["services"][service]
+        if definition.get("tmpfs") != mounts:
+            raise ValueError(
+                f"{service}: tmpfs must be a single quoted absolute mount: {mounts}"
+            )
+        if (
+            definition.get("read_only") is not True
+            or "ALL" not in definition.get("cap_drop", [])
+            or "no-new-privileges:true" not in definition.get("security_opt", [])
+        ):
+            raise ValueError(
+                f"{service}: production filesystem/capability safeguards are required"
+            )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config-only", action="store_true")
@@ -147,8 +170,14 @@ def main():
             return error.read()
 
     try:
-        compose("config", "--quiet")
-        print("PASS: isolated Compose configuration")
+        configuration = json.loads(
+            compose("--profile", "tools", "config", "--format", "json")
+        )
+        validate_compose_config(configuration)
+        print(
+            "PASS: isolated Compose configuration and runtime mount/security contract",
+            flush=True,
+        )
         if options.config_only:
             return
         run(["docker", "info", "--format", "{{.ServerVersion}}"])

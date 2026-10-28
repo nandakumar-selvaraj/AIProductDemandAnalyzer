@@ -1,3 +1,24 @@
+# Docker validation repair — 2026-10-28
+
+The production-stack failure on 29a415c was reproduced by rerunning workflow
+40721919563 (job 122941174565). Docker rejected `mode=1777` as a relative mount target
+before Alembic started. The YAML flow sequence `[/tmp:size=64m,mode=1777]` was parsed as
+two tmpfs entries; Compose schema validation passed despite the invalid runtime target.
+Quoting the complete mount preserves `/tmp:size=64m,mode=1777` as one entry for both
+backend and migration services. Read-only filesystems, ALL capability drops, no-new-
+privileges, the 64 MiB allocation and mode 1777 are unchanged.
+
+The disposable validator now checks rendered tmpfs and filesystem/capability safeguards
+before starting containers. Regression tests reject the original split and removal of
+safeguards. Baseline logs confirm production image builds, Caddy provisioning and DB
+health succeeded before the mount failure; later stages had not run on that baseline.
+
+Fixed-commit Docker integration and all three same-commit workflow results will be
+recorded after the remote verification completes. Local Docker Desktop startup has been
+attempted but its Linux engine is not yet responsive; no local container success is claimed.
+
+---
+
 # Current readiness — JWT authentication and RBAC (2026-10-28)
 
 JWT browser sessions now replace operator Bearer authorization in production. The
