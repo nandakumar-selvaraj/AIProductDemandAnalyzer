@@ -41,7 +41,7 @@ export class App {
   );
   private readonly currentUrl = signal('');
   protected readonly pageTitle = computed(
-    () => this.navigation.find((item) => item.path === (this.currentUrl().replace(/^\/demo(?=\/|$)/, '') || '/dashboard'))?.label ?? 'Dashboard',
+    () => this.currentUrl() === '/data-management' ? 'Data Management' : this.navigation.find((item) => item.path === (this.currentUrl().replace(/^\/demo(?=\/|$)/, '') || '/dashboard'))?.label ?? 'Dashboard',
   );
   protected readonly navigation = [
     { label: 'Dashboard', path: '/dashboard', icon: '▦' },

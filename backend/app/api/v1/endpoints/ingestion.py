@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion"])
 
 
+@router.get("/config", summary="Admin CSV upload limits")
+def upload_configuration():
+    settings = get_settings()
+    return {
+        "max_upload_bytes": max(
+            0, min(settings.max_upload_bytes, settings.max_request_bytes - 1024)
+        )
+    }
+
+
 @router.post(
     "/sales",
     response_model=IngestionSummary,
@@ -21,7 +31,9 @@ router = APIRouter(prefix="/ingestion", tags=["Data Ingestion"])
     description=(
         "Uploads a UTF-8 CSV with `date`, `store`, `item`, and `sales` columns. "
         "Exact duplicate keys use the last row; existing daily totals are updated. "
-        "The complete import is committed in one transaction."
+        "The complete import is committed in one transaction. "
+        "Requires Admin authorization when authentication is enabled. Browser requests "
+        "also require the approved Origin and session-bound CSRF header."
     ),
     responses={
         200: {"description": "CSV validated and sales rows ingested"},

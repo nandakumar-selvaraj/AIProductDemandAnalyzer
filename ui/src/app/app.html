@@ -49,6 +49,14 @@
         >
       }
     </nav>
+    @if (!publicDemo() && (!auth.enabled || auth.user()?.role === 'admin')) {
+      <div class="nav-label">MANAGEMENT</div>
+      <nav class="nav-list" aria-label="Management">
+        <a class="nav-link" routerLink="/data-management" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <span class="nav-icon" aria-hidden="true">⇧</span><span>Data Management</span>
+        </a>
+      </nav>
+    }
     <div class="sidebar-footer">
       <span class="status-dot"></span><span>Analytics workspace</span>
     </div>

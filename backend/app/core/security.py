@@ -123,6 +123,18 @@ class SecurityMiddleware:
                 "/api/v1/ready",
                 "/api/v1/demo/config",
             }
+            docs = (
+                settings.environment != "production"
+                and method == "GET"
+                and path
+                in {
+                    "/docs",
+                    "/redoc",
+                    "/openapi.json",
+                    "/docs/oauth2-redirect",
+                    "/",
+                }
+            )
             public = (
                 settings.public_demo_enabled
                 and principal is None
@@ -131,10 +143,12 @@ class SecurityMiddleware:
                     or (method == "POST" and path == DEMO_CHAT and settings.demo_ai_enabled)
                 )
             )
-            if not (principal or health or public or login_path):
+            if not (principal or health or public or login_path or docs):
                 return await reject(401, "authentication_required")
             state_change = method not in {"GET", "HEAD", "OPTIONS"}
-            if login_path or (principal and state_change):
+            if principal and principal.purpose == "api" and path.startswith("/api/v1/auth/"):
+                return await reject(403, "browser_session_required")
+            if login_path or (principal and principal.purpose == "browser" and state_change):
                 origin = headers.get(b"origin", b"").decode("latin1")
                 if origin not in settings.auth_allowed_origins:
                     return await reject(403, "csrf_origin_denied")

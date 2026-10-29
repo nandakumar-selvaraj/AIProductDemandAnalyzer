@@ -10,6 +10,7 @@ import os
 import re
 from pathlib import Path
 import secrets
+import shutil
 import socket
 import ssl
 import subprocess
@@ -53,7 +54,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config-only", action="store_true")
     parser.add_argument("--browser-tests", action="store_true")
+    parser.add_argument(
+        "--browser-container",
+        action="store_true",
+        help="Run production browsers in isolated Linux instead of the host",
+    )
     options = parser.parse_args()
+    if options.browser_container and not options.browser_tests:
+        parser.error("--browser-container requires --browser-tests")
     project = "phase7b-" + secrets.token_hex(6)
     work = ROOT / "validation" / project
     work.mkdir(parents=True, mode=0o700)
@@ -129,6 +137,17 @@ def main():
 
     def run(args, *, input=None, timeout=600):
         # Capture output: never dump Compose environments or connection strings to CI logs.
+        args = list(args)
+        executable = shutil.which(args[0])
+        if not executable and args[0] == "sh" and os.name == "nt":
+            candidate = (
+                Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+                / "Git/bin/sh.exe"
+            )
+            if candidate.is_file():
+                executable = str(candidate)
+        if executable:
+            args[0] = executable
         try:
             result = subprocess.run(
                 args,
@@ -148,8 +167,8 @@ def main():
                     result.stdout.decode(errors="replace")
                     + "\n"
                     + result.stderr.decode(errors="replace")
-                )[-12000:]
-            )
+                )
+            )[-12000:]
             raise RuntimeError(f"Command {args[0]} failed: {error}")
         return result.stdout
 
@@ -255,7 +274,7 @@ def main():
             "-m",
             "scripts.seed_demo",
         )
-        assert sql("SELECT version_num FROM alembic_version") == "0002_authentication"
+        assert sql("SELECT version_num FROM alembic_version") == "0003_api_tokens"
         assert sql("SELECT count(*) FROM sales_history") == "364"
         assert sql("SELECT count(*) FROM product_forecasts") == "28"
         print("PASS: PostgreSQL initialization, migration and synthetic seed")
@@ -339,6 +358,60 @@ def main():
         cookie = "; ".join(f"{key}={value.value}" for key, value in cookies.items())
         request("/api/v1/assistant/ready", 503, headers={"Cookie": cookie})
         print("PASS: internal TLS, static hosting, proxy routes, auth and disabled AI")
+        for role, email in (("admin", admin_email), ("viewer", viewer_email)):
+            api_token = (
+                compose(
+                    "run",
+                    "--rm",
+                    "migrate",
+                    "sh",
+                    "-c",
+                    'python -m scripts.manage_api_tokens issue --email "$1" '
+                    "--output /tmp/api-token >/dev/null && cat /tmp/api-token",
+                    "sh",
+                    email,
+                )
+                .decode()
+                .strip()
+            )
+            api_headers = {"Authorization": "Bearer " + api_token}
+            request(
+                "/api/v1/ingestion/config",
+                200 if role == "admin" else 403,
+                headers=api_headers,
+            )
+            request("/api/v1/auth/me", 403, headers=api_headers)
+            compose(
+                "run",
+                "--rm",
+                "migrate",
+                "python",
+                "-m",
+                "scripts.manage_api_tokens",
+                "revoke",
+                "--email",
+                email,
+            )
+            request("/api/v1/ingestion/config", 401, headers=api_headers)
+        request("/docs", 404)
+        request("/openapi.json", 404)
+        assert (
+            sql(
+                "SELECT has_table_privilege('demand_demo_reader','auth_api_tokens','SELECT')"
+            )
+            == "f"
+        )
+        assert (
+            sql("SELECT has_table_privilege('demand_app','auth_api_tokens','INSERT')")
+            == "f"
+        )
+        assert (
+            sql("SELECT has_table_privilege('demand_app','auth_api_tokens','UPDATE')")
+            == "f"
+        )
+        print(
+            "PASS: owner-issued API tokens, role enforcement, revocation and private Swagger"
+        )
         # Prove the demo reader cannot mutate data and the runtime cannot create schema.
         for role in ("demand_demo_reader", "demand_app"):
             assert (
@@ -406,7 +479,8 @@ def main():
             "phase7b_restore_demo",
         )
         sql(
-            "REVOKE ALL ON auth_users, auth_sessions FROM demand_demo_reader; "
+            "REVOKE ALL ON auth_users, auth_sessions, auth_api_tokens FROM demand_demo_reader; "
+            "GRANT SELECT ON auth_api_tokens TO demand_app; "
             "REVOKE ALL ON auth_users FROM demand_app; "
             "GRANT SELECT ON auth_users TO demand_app; "
             "GRANT UPDATE(password_hash) ON auth_users TO demand_app",
@@ -464,17 +538,83 @@ def main():
                 E2E_EXTERNAL_SERVERS="1",
                 E2E_PUBLIC_DEMO="1",
                 E2E_BASE_URL=f"https://localhost:{port}",
-            )
-            run(["npm", "--prefix", "ui", "run", "e2e", "--", "public-demo.spec.ts"])
-            print("PASS: production public-demo Playwright browser checks")
-            env.update(
                 E2E_AUTH="1",
                 E2E_ADMIN_EMAIL=admin_email,
                 E2E_VIEWER_EMAIL=viewer_email,
                 E2E_AUTH_PASSWORD=test_password,
+                E2E_CAPTURE_ARTIFACTS="0",
             )
-            run(["npm", "--prefix", "ui", "run", "e2e", "--", "authentication.spec.ts"])
-            print("PASS: production JWT authentication browser checks")
+            if options.browser_container:
+                browser_args = [
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--name",
+                    project + "-browser",
+                    "--label",
+                    "com.docker.compose.project=" + project,
+                    "--network",
+                    project + "_private",
+                    "--user",
+                    "pwuser",
+                    "--read-only",
+                    "--tmpfs",
+                    "/tmp:size=1g,mode=1777",
+                    "--memory",
+                    "1536m",
+                    "--cpus",
+                    "2",
+                    "--pids-limit",
+                    "256",
+                    "--shm-size",
+                    "256m",
+                    "--cap-drop",
+                    "ALL",
+                    "--security-opt",
+                    "no-new-privileges:true",
+                    "--mount",
+                    f"type=bind,src={ROOT / 'ui'},dst=/source,readonly",
+                    "--mount",
+                    f"type=bind,src={ROOT / 'deploy/browser-validation.cjs'},dst=/runner.cjs,readonly",
+                    "--env",
+                    "NPM_CONFIG_CACHE=/tmp/npm-cache",
+                ]
+                for key in (
+                    "E2E_EXTERNAL_SERVERS",
+                    "E2E_PUBLIC_DEMO",
+                    "E2E_BASE_URL",
+                    "E2E_AUTH",
+                    "E2E_ADMIN_EMAIL",
+                    "E2E_VIEWER_EMAIL",
+                    "E2E_AUTH_PASSWORD",
+                    "E2E_CAPTURE_ARTIFACTS",
+                ):
+                    browser_args.extend(["--env", key])
+                browser_args.extend(
+                    [
+                        "mcr.microsoft.com/playwright:v1.64.1-noble",
+                        "sh",
+                        "-c",
+                        "mkdir /tmp/tests && cd /tmp/tests && "
+                        "cp /source/package.json /source/package-lock.json /source/playwright.config.ts . && "
+                        "cp -R /source/e2e . && npm ci --ignore-scripts --no-audit --no-fund && node /runner.cjs",
+                    ]
+                )
+                print(redact(run(browser_args).decode(errors="replace")), flush=True)
+                print(
+                    "PASS: isolated Linux production public-demo and JWT browser checks"
+                )
+            else:
+                for suite in ("public-demo.spec.ts", "authentication.spec.ts"):
+                    print(
+                        redact(
+                            run(
+                                ["npm", "--prefix", "ui", "run", "e2e", "--", suite]
+                            ).decode(errors="replace")
+                        ),
+                        flush=True,
+                    )
+                print("PASS: production public-demo and JWT browser checks")
         # No destructive commands until all ownership checks below succeed.
         print(
             "Docker integration validation completed; disposable stack will be removed"
@@ -500,6 +640,25 @@ def main():
         try:
             if owned:
                 assert project.startswith("phase7b-") and len(project) == 20
+                if options.browser_container:
+                    # This exact random name/label was reserved by the collision checks above.
+                    remaining = (
+                        run(
+                            [
+                                "docker",
+                                "ps",
+                                "-aq",
+                                "--filter",
+                                "name=^/" + project + "-browser$",
+                                "--filter",
+                                "label=com.docker.compose.project=" + project,
+                            ]
+                        )
+                        .decode()
+                        .strip()
+                    )
+                    if remaining:
+                        run(["docker", "rm", "-f", remaining])
                 compose("down", "--volumes", "--remove-orphans")
         finally:
             env_file.unlink(missing_ok=True)

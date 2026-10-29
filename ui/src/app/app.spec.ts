@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
+import { AuthService } from './core/services/auth.service';
 
 @Component({ template: '<p>Page content</p>' })
 class RoutePage {}
@@ -58,6 +59,18 @@ describe('App navigation', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows Management navigation only for admin users', () => {
+    const auth = TestBed.inject(AuthService);
+    Object.defineProperty(auth, 'enabled', { value: true });
+    auth.user.set({ id: 'synthetic', email: 'viewer@example.invalid', role: 'viewer' });
+    createApp();
+    expect(root.querySelector('[aria-label="Management"]')).toBeNull();
+    auth.user.set({ ...auth.user()!, role: 'admin' }); fixture.detectChanges();
+    expect(root.querySelector('[aria-label="Management"]')?.textContent).toContain('Data Management');
+    auth.user.set(null); fixture.detectChanges();
+    expect(root.querySelector('[aria-label="Management"]')).toBeNull();
+  });
+
   it('shows the application name, skip link, and all workspace sections', () => {
     createApp();
     expect(root.querySelector('.brand')?.getAttribute('aria-label')).toContain(
@@ -65,7 +78,7 @@ describe('App navigation', () => {
     );
     expect(root.querySelector('.skip-link')?.getAttribute('href')).toBe('#main-content');
     expect(
-      Array.from(root.querySelectorAll('nav a'), (link) => link.getAttribute('aria-label')),
+      Array.from(root.querySelectorAll('nav[aria-label="Workspace"] a'), (link) => link.getAttribute('aria-label')),
     ).toEqual(['Dashboard', 'Products', 'Demand Analysis', 'Forecasts', 'Reports', 'AI Assistant']);
   });
 

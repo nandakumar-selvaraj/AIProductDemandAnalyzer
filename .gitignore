@@ -59,6 +59,7 @@ coverage.xml
 *.trace.zip
 *.pem
 *.key
+*.token
 *.p12
 *.pfx
 **/storage-state*.json

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, GuardResult } from '@angular/router';
 import { firstValueFrom, Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { authGuard } from './auth.guard';
+import { adminGuard, authGuard } from './auth.guard';
 import { authInterceptor } from './auth.interceptor';
 import { AuthService, BrowserSession } from './services/auth.service';
 import { DemoService } from './services/demo.service';
@@ -73,6 +73,19 @@ describe('Browser authentication', () => {
     login();
     const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
     expect(await firstValueFrom(result as Observable<GuardResult>)).toBe(true);
+  });
+
+  it('restricts the management route to admins and redirects anonymous users to login', async () => {
+    const result = TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+    const resolved = firstValueFrom(result as Observable<GuardResult>);
+    http.expectOne(`${base}/auth/me`).flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(String(await resolved)).toBe('/login');
+    login();
+    const viewer = TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+    expect(String(await firstValueFrom(viewer as Observable<GuardResult>))).toBe('/dashboard');
+    auth.user.set({ ...auth.user()!, role: 'admin' });
+    const admin = TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never));
+    expect(await firstValueFrom(admin as Observable<GuardResult>)).toBe(true);
   });
 
   it('expires proactively, clears CSRF/timer state and redirects', () => {

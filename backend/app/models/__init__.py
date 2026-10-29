@@ -1,6 +1,6 @@
 """Import all models so Alembic can discover metadata."""
 
-from app.models.auth import AuthSession, User
+from app.models.auth import ApiToken, AuthSession, User
 from app.models.forecast_run import ForecastRun
 from app.models.forecast_run_log import ForecastRunLog
 from app.models.inventory import Inventory
@@ -11,6 +11,7 @@ from app.models.stock_recommendation import StockRecommendation
 from app.models.store import Store
 
 __all__ = [
+    "ApiToken",
     "AuthSession",
     "User",
     "ForecastRun",

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.v1.router import api_router
@@ -45,6 +46,7 @@ app = FastAPI(
     docs_url="/docs",
     openapi_url="/openapi.json",
     redoc_url="/redoc",
+    swagger_ui_parameters={"persistAuthorization": False},
     openapi_tags=[
         {
             "name": "Health",
@@ -89,6 +91,60 @@ app = FastAPI(
 )
 app.include_router(api_router, prefix="/api/v1")
 app.add_middleware(SecurityMiddleware)
+
+
+def documented_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "ApiBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "Owner CLI-issued API token only (1–15 minutes). Browser JWTs are rejected. "
+                "RBAC and server-side revocation apply. Use a separate cookie-free Swagger "
+                "session; never persist authorization."
+            ),
+        },
+        "BrowserSession": {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": "__Host-demand_session",
+            "description": (
+                "HttpOnly browser session (demand_session in development). Browser mutations "
+                "also require an allowed Origin and session-bound X-CSRF-Token. "
+                "Not settable through Swagger."
+            ),
+        },
+    }
+    public = {"/api/v1/auth/login", "/api/v1/health", "/api/v1/ready", "/api/v1/demo/config"}
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            if method not in {"get", "post", "put", "patch", "delete", "head", "options"}:
+                continue
+            if path not in public:
+                operation["security"] = [{"BrowserSession": []}]
+                if not path.startswith("/api/v1/auth/"):
+                    operation["security"].append({"ApiBearer": []})
+                operation.setdefault("responses", {}).update(
+                    {
+                        "401": {"description": "Missing, invalid, expired or revoked credential"},
+                        "403": {"description": "Role denied or browser CSRF validation failed"},
+                    }
+                )
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = documented_openapi
 
 
 @app.get("/", include_in_schema=False)

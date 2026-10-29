@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.auth import LoginRequest
 from app.db.session import get_engine
-from app.models.auth import AuthSession, User
+from app.models.auth import ApiToken, AuthSession, User
 from app.services.auth_service import PASSWORDS
 
 
@@ -66,6 +66,11 @@ def main():
             db.execute(
                 update(AuthSession)
                 .where(AuthSession.user_id == user.id)
+                .values(revoked_at=datetime.now(UTC))
+            )
+            db.execute(
+                update(ApiToken)
+                .where(ApiToken.user_id == user.id)
                 .values(revoked_at=datetime.now(UTC))
             )
         db.commit()

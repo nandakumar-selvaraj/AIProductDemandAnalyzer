@@ -31,7 +31,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON stores, products, sales_history, invento
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO demand_app;
 GRANT SELECT ON stores, products, sales_history, inventory, forecast_runs,
   forecast_run_logs, product_forecasts, stock_recommendations TO demand_demo_reader;
-REVOKE ALL ON auth_users, auth_sessions FROM demand_demo_reader;
+REVOKE ALL ON auth_users, auth_sessions, auth_api_tokens FROM demand_demo_reader;
+REVOKE ALL ON auth_api_tokens FROM demand_app;
+GRANT SELECT ON auth_api_tokens TO demand_app;
 REVOKE ALL ON auth_users FROM demand_app;
 GRANT SELECT ON auth_users TO demand_app;
 GRANT UPDATE(password_hash) ON auth_users TO demand_app;
@@ -67,7 +69,7 @@ and the synthetic-v1 database marker after verification; retain normal runtime g
 above for operator connectivity. Never mark a private database as a demo.
 
 
-Auth tables contain password hashes and revocation state and are part of the database
+Auth tables (including auth_api_tokens from revision 0003) contain password hashes and revocation state and are part of the database
 backup. Encrypt them off-host and restrict access. JWT signing keys remain separate
 server secrets and are not in the DB dump. A restore can reintroduce previously active
 session rows from the snapshot: rotate the signing key on disaster recovery to invalidate

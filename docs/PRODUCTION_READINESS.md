@@ -1,3 +1,143 @@
+# Phase 7C readiness — 2026-10-29
+
+Implemented and validated locally. A local commit was explicitly requested after review;
+no push, cloud deployment, paid inference or real credential provisioning was performed.
+Forecasting and existing ingestion/upsert algorithms are unchanged.
+
+## Architecture and security
+
+- Admin-only Data Management navigation/guard and server-enforced ingestion RBAC.
+  File extension/empty/size validation uses Admin-only server configuration; uploads use
+  the existing endpoint and cookie/CSRF interceptor. Progress, errors, current result,
+  duplicate-submission prevention and cancellation/expiry behavior are covered.
+- Owner CLI-issued API tokens use a distinct purpose/audience and separate revocation
+  table; default 10-minute, maximum 15-minute lifetime. Signature, claims, user status,
+  role, JWT expiry and database state are checked per request. No public token endpoint.
+- Browser login never returns a JWT. Cookies remain HttpOnly; cookie mutations retain
+  Origin/CSRF checks. Mixed credentials and cross-transport token reuse are rejected.
+- OpenAPI declares HTTP Bearer and cookie alternatives; Swagger authorization is memory
+  only. Documentation remains inaccessible in production. See AUTHENTICATION.md for
+  restricted access, provisioning, expiry, revocation and token-file handling.
+- Additive migration `0003_api_tokens` preserves existing business data/session rows.
+  Runtime receives SELECT only on API tokens; demo reader receives no auth-table access.
+  Backup/restore ACL instructions and Docker validation assertions include the new table.
+
+## Executed validation
+
+| Check | Phase 7C result |
+|---|---|
+| Backend `python -m pytest tests -q` | 200 passed; 1 opt-in PostgreSQL test skipped here |
+| Disposable PostgreSQL `scripts.validate_local --postgres-only` | 1 passed; migrations through 0003 and actual repeat/upsert persistence |
+| Backend/deploy Ruff lint and format | Passed |
+| Angular unit tests | 266 passed (19 files) |
+| Angular lint and E2E TypeScript | Passed |
+| Angular production build | Passed; 662.77 kB initial / 122.53 kB estimated transfer; upload page is a 6.30 kB lazy chunk |
+| Authenticated browser `scripts.validate_local --auth-e2e` | 7 passed in installed Edge: Admin CSV upload/re-upload, Viewer route/API denial, upload-page expiry, Swagger Authorize + actual API request, cookie refresh, logout/replay and navigation |
+| Existing browser `scripts.validate_local` | 8 passed; 10 mode-specific tests skipped here and executed in their separate auth/Docker modes |
+| `deploy/validate_docker.py --browser-tests --browser-container` | Passed completely on local Docker Desktop Linux Engine 29.1.3; 3 public-demo + 6 production-auth/upload browser tests passed; 1 Swagger test intentionally skipped because production docs are disabled |
+
+The first Swagger browser run exposed a test selector mismatch: Swagger's accessible
+button name is "Apply credentials" although its visible text is "Authorize". The test
+was corrected and all seven tests passed on rerun; no authentication check was bypassed.
+Synthetic tokens are issued privately, removed after provisioning, and never printed.
+Swagger test failures clear the page and omit credential details before diagnostics.
+Authentication tests disable traces/video/screenshots and enter the API token without
+putting its value in a Playwright fill-step title. Production JavaScript was scanned for
+JWT literals, private-key markers and server-only signing/provider-key variable names;
+none were found.
+
+Docker Desktop was initially unavailable, then started by the user. The first container
+run exposed `/docs` falling through to Angular's SPA (not an exposed Swagger page); Caddy
+now explicitly returns 404 for developer-doc paths. Windows tool resolution supports Git
+for Windows `sh` and npm.CMD. Host browser attempts first lacked Playwright Chromium,
+then installed Edge was intercepted by Kaspersky's certificate-block page. Host trust
+and security settings were left unchanged. The final optional Linux browser runner uses
+the exact same TLS authority/Origin, read-only root/source, restricted temporary storage,
+non-root user, dropped capabilities and resource limits. It skips unused dependency
+build lifecycle scripts, not tests; the production build still executes normally.
+
+An upload E2E timing issue was also corrected: file selection now waits until server
+limits load and the input becomes enabled, matching actual browser interaction. The final
+restricted auth suite passed all seven tests and the final Docker run exited zero.
+
+The Docker run verified new PostgreSQL initialization, revision 0003, synthetic seed,
+Admin/Viewer provisioning, private token-table ACLs, CLI issue/revoke, FastAPI readiness,
+verified internal TLS, Caddy/Angular routing, production cookie login/expiry, CSV upsert,
+Viewer/anonymous write denial, restored counts/connectivity, unchanged source data, and
+restart/container-recreation persistence. Disposable containers, volumes and networks
+were removed afterwards. Sampled four-service idle memory was approximately 154 MiB
+(API 84, PostgreSQL 40, nginx 18, Caddy 13 MiB); this is not a peak/import/VPS load result.
+
+## Prior Docker repair and CI provenance
+
+All three workflows succeeded on code commit `24ad80e6905dfb79d314388aac6d55ca749e38cc`:
+[Backend CI](https://github.com/nandakumar-selvaraj/AIProductDemandAnalyzer/actions/runs/40725299376),
+[synthetic E2E](https://github.com/nandakumar-selvaraj/AIProductDemandAnalyzer/actions/runs/40725299365),
+[production Docker validation](https://github.com/nandakumar-selvaraj/AIProductDemandAnalyzer/actions/runs/40725299361).
+That production run verified PostgreSQL initialization/migration, provisioning, FastAPI,
+Caddy TLS/routing, Angular login, expiration, persistence and backup/restore. The original
+mount failure and the subsequent TLS probe identity issue are described below.
+
+These successful CI runs predate Phase 7C. The new Phase 7C checks passed locally in the
+Linux Docker stack, including production upload E2E. No same-commit CI result is claimed
+for Phase 7C; push only when instructed, then require all three workflows to pass before
+deployment approval.
+
+## Remaining deployment gates and operational risks
+
+Local Phase 7C acceptance checks are green. Do not deploy yet: require post-review CI
+after an authorized push. Then configure real domain/HTTPS origins and private server secrets, scan/pin deployment
+images, rehearse encrypted off-host recovery and key rotation, and measure concurrent
+login/import/forecast memory on the proposed VPS. Historical Kaggle imports can be large;
+split under upload bounds and load-test representative data. Revocation cannot undo an
+already accepted in-flight import. Never put private customer data in the public demo.
+
+No dependencies were added. The preceding audit found zero production npm advisories
+but outstanding Angular-build/Vite development-tool advisories; update and revalidate
+those tools before exposing any development server. The default development profile is
+loopback-only guidance, not a production authentication substitute. Preserve single-worker
+rate-limit assumptions or add shared admission accounting before scaling.
+
+The sections below are historical phase records; this section is the current assessment.
+
+## Phase 7C file inventory (31 files)
+
+```text
+.gitignore
+backend/Dockerfile
+backend/alembic/versions/0003_api_tokens.py
+backend/app/api/v1/endpoints/ingestion.py
+backend/app/core/security.py
+backend/app/main.py
+backend/app/models/__init__.py
+backend/app/models/auth.py
+backend/app/services/auth_service.py
+backend/scripts/manage_api_tokens.py
+backend/scripts/manage_users.py
+backend/scripts/validate_local.py
+backend/tests/unit/test_api_tokens.py
+backend/tests/unit/test_ingestion_http.py
+deploy/Caddy.routes
+deploy/browser-validation.cjs
+deploy/validate_docker.py
+docs/AUTHENTICATION.md
+docs/BACKUP_RESTORE.md
+docs/DEPLOYMENT.md
+docs/PRODUCTION_READINESS.md
+ui/e2e/authentication.spec.ts
+ui/src/app/app.html
+ui/src/app/app.routes.ts
+ui/src/app/app.spec.ts
+ui/src/app/app.ts
+ui/src/app/core/auth.guard.ts
+ui/src/app/core/auth.spec.ts
+ui/src/app/features/data-management/data-management.page.html
+ui/src/app/features/data-management/data-management.page.spec.ts
+ui/src/app/features/data-management/data-management.page.ts
+```
+
+---
+
 # Docker validation follow-up: TLS probe — 2026-10-28
 
 Commit ccf6386 passed container creation, PostgreSQL initialization, migrations and
@@ -10,7 +150,7 @@ internal-CA test setting; production public-certificate policy is unchanged.
 
 Diagnostics now include redacted stdout/stderr and container logs on failure, with
 bounded command timeouts and no environment dumps. Regression tests cover the Caddy
-hostname contract. Full Docker validation continues on the follow-up commit.
+hostname contract. Full Docker validation passed on 24ad80e (links above).
 
 ---
 
@@ -29,8 +169,8 @@ before starting containers. Regression tests reject the original split and remov
 safeguards. Baseline logs confirm production image builds, Caddy provisioning and DB
 health succeeded before the mount failure; later stages had not run on that baseline.
 
-Fixed-commit Docker integration and all three same-commit workflow results will be
-recorded after the remote verification completes. Local Docker Desktop startup has been
+Fixed-commit Docker integration and all three same-commit workflows passed on 24ad80e.
+Local Docker Desktop startup has been
 attempted but its Linux engine is not yet responsive; no local container success is claimed.
 
 ---

@@ -151,6 +151,28 @@ try:
             )
             if provision.returncode:
                 raise RuntimeError("Synthetic user provisioning failed; credentials omitted")
+        token_file = work / (name + ".token")
+        try:
+            provision = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.manage_api_tokens",
+                    "issue",
+                    "--email",
+                    env["E2E_ADMIN_EMAIL"],
+                    "--output",
+                    str(token_file),
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if provision.returncode:
+                raise RuntimeError("Synthetic API token provisioning failed; credentials omitted")
+            env["E2E_API_TOKEN"] = token_file.read_text().strip()
+        finally:
+            token_file.unlink(missing_ok=True)
     proxy = work / "proxy.json"
     proxy.write_text('{"/api":{"target":"http://127.0.0.1:' + str(api_port) + '","secure":false}}')
     commands = [

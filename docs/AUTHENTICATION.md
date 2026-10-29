@@ -1,5 +1,82 @@
 # JWT authentication and role-based authorization
 
+## Phase 7C: restricted Swagger and API tokens
+
+Browser login still returns only user, expiry and CSRF metadata; JWTs remain HttpOnly
+cookies. New browser tokens carry `purpose=browser`; existing sessions remain valid until
+their original expiry. Angular never receives an API token.
+
+API tokens use `purpose=api`, audience `<JWT_AUDIENCE>:api`, the configured issuer/HS256
+key, and a separate `auth_api_tokens` revocation record. Every request checks signature,
+claim types, purpose, issuer, audience, JWT/database expiry, user status, current role and
+revocation. Lifetime is 1–15 minutes (default 10). No refresh/public minting endpoint exists.
+Browser JWTs cannot authenticate as Bearer tokens, and API tokens cannot authenticate as
+cookies. Requests carrying both credentials are rejected. Token-only requests do not use
+browser CSRF; cookie requests retain all Origin/CSRF checks. API tokens cannot use browser
+`/auth/me` or `/auth/logout`. Admin/Viewer authorization and AI quotas apply equally.
+
+Use the **database-owner** CLI in the same trusted environment as the API. For restricted
+local development, from `backend`, with AUTH_ENABLED=true and the same signing settings:
+
+```sh
+umask 077
+python -m alembic upgrade head
+python -m scripts.manage_api_tokens issue --email "$DEVELOPER_EMAIL" \
+  --minutes 10 --output /private/operator/api.token
+python -m scripts.manage_api_tokens revoke --email "$DEVELOPER_EMAIL"
+```
+
+The output directory must already exist and be private. Issuance exclusively creates a
+new file with POSIX mode 0600, refuses overwrites, and never prints the credential. On
+Windows, use an operator-only directory ACL; POSIX mode bits do not configure Windows ACLs.
+Never commit the file, put tokens in URLs, command arguments, logs/tickets, or persistent
+browser storage. Delete the file after use. Revoke ends all API tokens for the named user
+without ending browser sessions. Password reset, role change and disable revoke both.
+Rows store identifiers/expiry, never JWT contents. Key rotation invalidates both flows.
+
+Open `/docs` on a loopback-bound development API or through an approved SSH tunnel to
+an isolated operations instance. Use a separate cookie-free browser profile. Click
+**Authorize**, enter the token under **ApiBearer**, and execute protected operations.
+Swagger authorization stays in memory (`persistAuthorization=false`); close the tab and
+revoke afterwards. Do not manually authorize BrowserSession. Swagger uses its existing
+CDN assets; the restricted browser needs access to that CDN.
+
+Direct production FastAPI requests return 404 for `/docs`, `/redoc`, `/openapi.json` and
+its API root `/`. Caddy also explicitly rejects documentation paths, while the public
+site root continues serving Angular. There is no production docs-enable flag. Never switch a public production API to development
+to access Swagger. Owner CLI access is equivalent to administrative server access: keep
+owner credentials out of the running API and restrict operator access.
+
+Migration `0003_api_tokens` is additive: it preserves business data/browser sessions,
+adds the separate token table/index, grants runtime SELECT only, and denies all access
+to the demo reader. Only the owner CLI issues/revokes tokens. OpenAPI declares cookie
+and Bearer alternatives on protected business operations and cookie-only auth endpoints.
+
+## Phase 7C: Data Management navigation and ingestion
+
+**Management → Data Management** (`/data-management`) is Admin-only with authentication
+enabled. Viewers redirect to dashboard; anonymous users redirect to login. Server RBAC
+independently rejects Viewer/anonymous uploads. The existing unauthenticated loopback
+development profile remains available; production cannot disable authentication.
+
+The page loads Admin-only `/api/v1/ingestion/config` and posts FormData to the existing
+`/api/v1/ingestion/sales` endpoint through the cookie/CSRF interceptor. The effective UI
+limit is the lesser of the CSV limit and request limit minus 1 KiB multipart allowance.
+Extension, empty-file and size checks improve feedback; server content/size validation
+remains authoritative. No Kaggle credentials or automatic downloads are involved. Split
+large datasets below configured bounds rather than removing server/proxy limits.
+
+Required schema: `date,store,item,sales`. Kaggle 2013–2017 records are labelled historical
+demo data. The last valid duplicate wins, existing totals are updated, valid rows commit
+together, and rejected rows are reported. The page shows only its latest upload result;
+ingestion history is not persisted. Progress is determinate when supported by the browser
+transport (Angular Fetch may show indeterminate progress). Double submissions are blocked.
+Logout/expiry/navigation cancels waiting and clears results; already admitted server work
+may finish. Check sales before retrying an interrupted import.
+
+The sections below describe the earlier browser-auth implementation; Phase 7C supersedes
+the earlier statement that no Bearer flow exists. Legacy OPERATOR_TOKEN remains ignored.
+
 Implemented on top of ce6515a. No UpCloud/cloud deployment or real account provisioning
 was performed. All validation users/databases were synthetic and disposable.
 
@@ -42,7 +119,7 @@ single-worker controls; use a shared limiter before adding replicas or workers.
 ## CSRF
 
 Login requires an exact approved Origin plus X-Requested-With: AIProductDemandAnalyzer.
-Every authenticated unsafe method (including analytical POSTs and logout) requires both
+Every cookie-authenticated unsafe method (including analytical POSTs and logout) requires both
 an approved Origin and X-CSRF-Token matching the HMAC derived from the current server
 session identifier and signing key. CSRF is returned by login/me and held only in memory.
 No CORS wildcard/credentialed cross-origin access is enabled; SameSite is additional
@@ -77,8 +154,8 @@ preventing another account from reusing a client-supplied conversation capabilit
 
 The previous OPERATOR_TOKEN does not authorize HTTP requests anymore. Its legacy setting
 is accepted for environment-file compatibility only and ignored by authorization. There
-is no Bearer fallback or second production bypass. Use an admin browser session for HTTP
-operations and the database-owner CLI for provisioning/migrations. Remove old operator
+is no legacy Bearer fallback. Phase 7C's purpose-separated API tokens are independently
+revocable and enforce the same RBAC. Use the database-owner CLI for provisioning/migrations. Remove old operator
 secrets from deployment configuration after this transition. Production cannot disable
 authentication; AUTH_ENABLED=false is rejected there.
 

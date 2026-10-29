@@ -2,6 +2,60 @@
 
 Prepared for Linux Docker Compose; no deployment has been performed.
 
+## Phase 7C migration and restricted operations
+
+The production image includes the Admin Data Management page and owner-only API-token
+CLI. Before replacing the API image, take a backup and apply additive migration
+`0003_api_tokens` with the owner migration service:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yml build backend frontend
+docker compose --env-file .env.production -f compose.production.yml run --rm migrate
+docker compose --env-file .env.production -f compose.production.yml up -d --wait backend frontend proxy
+```
+
+These are future operator commands, not deployment actions taken during this phase.
+Existing data and browser sessions are preserved; never remove volumes. Prefer a forward
+fix or previous compatible application image on rollback; do not downgrade/drop the
+token table as an automatic rollback. Revoke issued API tokens before reverting to code
+that does not recognize them. Restores must preserve private auth ACLs (BACKUP_RESTORE.md).
+
+Admin users see **Management → Data Management**. The page uses existing ingestion/upsert
+semantics, HttpOnly cookies and CSRF. Viewers cannot access it or upload via the API.
+Kaggle 2013–2017 imports are historical demo data; upload only approved synthetic/public
+data to a public demo. CSV default limit remains 25 MiB; request/proxy limits also apply.
+
+Swagger remains disabled in production. For a loopback development or isolated tunneled
+operations instance, use AUTHENTICATION.md's owner-issued, short-lived API-token flow.
+Never enable public developer docs, return browser JWTs from login, or place any token/key
+in Angular configuration. No paid provider, cloud instance or production credential was
+activated. Phase 7C was validated locally and a local commit explicitly requested;
+push and deployment require their own instructions.
+
+For local Docker validation when Windows security software intercepts the disposable
+internal certificate, run browsers inside the isolated Linux test network:
+
+```sh
+python deploy/validate_docker.py --browser-tests --browser-container
+```
+
+This optional path uses the matching official Playwright 1.64.1 image, a read-only source
+mount/root filesystem, temporary dependency installation, an unprivileged user, dropped
+capabilities, no-new-privileges and bounded CPU/memory/PIDs. A test-only raw TCP forwarder
+preserves the existing localhost TLS authority, port and Origin while connecting to Caddy
+inside Docker. It exposes no additional host ports and changes no host trust/antivirus
+settings. The runner and its files are disposable; the production services keep their
+original restrictions. Allow extra local/CI disk and about 1.5 GiB memory for this temporary
+test runner; do not count it as a resident VPS service. Keep the image version aligned with
+the pinned @playwright/test dependency. Git for Windows supplies `sh` for backup scripts;
+the validator also resolves Windows npm.CMD when using host browser mode.
+
+The test-only install uses `npm ci --ignore-scripts` because it executes already-built
+production assets and Playwright's image browsers. Angular/esbuild lifecycle scripts are
+not needed there and cannot execute on the restricted temporary mount. Production image
+builds still perform normal `npm ci` and the actual Angular production build. All browser
+tests execute unchanged; authentication, TLS, RBAC and CSRF checks are preserved.
+
 ## Capacity and budget
 
 Planning estimate, not a benchmark or provider quotation: 2 shared vCPU, 4 GiB RAM,

@@ -1,0 +1,30 @@
+<h1>Data Management</h1>
+<p>Admin sales dataset upload. Kaggle 2013–2017 sales are historical demo data, not current demand.</p>
+<c-card><c-card-body>
+  <h2>Upload sales CSV</h2>
+  <p>Required UTF-8 schema: <code>date,store,item,sales</code>. Use dates such as 2013-01-01 and non-negative integer sales.</p>
+  <p>For duplicate date/store/item keys in a file, the last valid row wins. Existing daily totals are updated (upsert), not added. Invalid rows are reported; valid rows are committed together.</p>
+  @if (limit() !== null) { <p>Maximum file size: {{ limit() }} bytes (server-configured, with space reserved for multipart headers).</p> }
+  <form (submit)="$event.preventDefault(); submit()">
+    <label for="sales-csv" class="form-label">Sales CSV file</label>
+    <input #csvInput id="sales-csv" class="form-control" type="file" accept=".csv,text/csv" (change)="select($event)" [disabled]="pending() || limit() === null" />
+    @if (file(); as selected) { <p>Selected: {{ selected.name }} · {{ selected.size }} bytes</p> }
+    <div class="actions"><button class="btn btn-primary" type="submit" [disabled]="pending() || !file()">{{ pending() ? 'Uploading…' : 'Upload CSV' }}</button></div>
+  </form>
+  @if (pending()) {
+    <p role="status">{{ progress() === null ? 'Uploading and processing. Your browser may not report upload progress.' : 'Upload sent: ' + progress() + '%. Waiting for server validation.' }}</p>
+    <progress aria-label="CSV upload progress" max="100" [attr.value]="progress()"></progress>
+    <p>Leaving this page cancels waiting, but the server may still finish the import. Check the sales report before retrying.</p>
+  }
+  @if (error()) { <c-alert color="danger" role="alert">{{ error() }}</c-alert> }
+  @if (summary(); as result) {
+    <section aria-label="Latest upload result" aria-live="polite">
+      <h2>Upload completed</h2>
+      <dl><dt>Records read</dt><dd>{{ result.records_read }}</dd><dt>Inserted</dt><dd>{{ result.inserted }}</dd>
+        <dt>Updated</dt><dd>{{ result.updated }}</dd><dt>Rejected</dt><dd>{{ result.rejected }}</dd>
+        <dt>Duplicate rows skipped</dt><dd>{{ result.skipped }}</dd></dl>
+      @if (result.issues.length) { <ul class="issues">@for (issue of result.issues; track $index) { <li>Row {{ issue.row }}: {{ issue.reason }}</li> }</ul> }
+    </section>
+  }
+  <p>This page shows only the result of this upload. Historical ingestion metadata is not persisted.</p>
+</c-card-body></c-card>

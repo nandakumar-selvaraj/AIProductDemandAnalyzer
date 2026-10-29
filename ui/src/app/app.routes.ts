@@ -1,7 +1,11 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth.guard';
+import { adminGuard, authGuard } from './core/auth.guard';
 
 export const routes: Routes = [
+  {
+    path: 'data-management', canActivate: [adminGuard], title: 'Data Management',
+    loadComponent: () => import('./features/data-management/data-management.page').then((m) => m.DataManagementPage),
+  },
   { path: 'login', loadComponent: () => import('./features/auth/login.page').then((m) => m.LoginPage) },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
