@@ -1,0 +1,8 @@
+# Public configuration only. GitHub workflows map the equivalent Environment variables.
+zone                    = "REPLACE_WITH_VERIFIED_ZONE"
+plan                    = "REPLACE_WITH_VERIFIED_2CPU_4GB_PLAN"
+ssh_allowed_cidrs       = ["203.0.113.10/32"]
+deploy_user             = "deployer"
+deploy_ssh_public_key   = "REPLACE_WITH_DEPLOY_ED25519_PUBLIC_KEY"
+operator_ssh_public_key = "REPLACE_WITH_DISTINCT_OPERATOR_ED25519_PUBLIC_KEY"
+data_size_gb            = 40

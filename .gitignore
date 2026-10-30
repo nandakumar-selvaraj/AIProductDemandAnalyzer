@@ -76,5 +76,16 @@ Thumbs.db
 
 !.env.production.example
 /backups/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+**/backend.hcl
+crash.log
+crash.*.log
+**/release-manifest.json
 
 /validation-migration.sql

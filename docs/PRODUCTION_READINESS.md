@@ -1,3 +1,22 @@
+# Phase 8A infrastructure readiness — 2026-10-30
+
+Local implementation and validation are described in [PHASE8A_INFRASTRUCTURE.md](PHASE8A_INFRASTRUCTURE.md)
+and [PHASE8A_VALIDATION.md](PHASE8A_VALIDATION.md). Terraform/provider lock, cloud-init,
+shared ingress, manual plan/apply/deploy workflows, digest publication, encrypted backup
+and restore verification are prepared. A local commit was explicitly requested after
+review. No apply/destroy, cloud resources, real production credentials, deployment or push
+was performed.
+
+Before Phase 8B: configure the live GitHub production Environment and independent review
+policy, separate encrypted/versioned/locked state backend, real scoped secrets/public keys,
+approved static SSH runner egress, current UpCloud quote/capacity and an off-host backup
+repository. Provisioning does not require a domain and stops at the public-IP output.
+Application deployment waits for the friend's DNS record and validates HTTPS. Bootstrap,
+real state/approval/SSH, disk mapping and off-host recovery still need an authorized live
+acceptance run. Terraform mock tests and local Docker checks do not claim those passed.
+
+---
+
 # Phase 7C readiness — 2026-10-29
 
 Implemented and validated locally. A local commit was explicitly requested after review;

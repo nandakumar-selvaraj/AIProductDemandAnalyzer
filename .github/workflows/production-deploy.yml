@@ -1,0 +1,45 @@
+name: Approved production deployment
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Docker build run containing the verified digest manifest
+        required: true
+      expected_sha:
+        description: Verified image commit (40 hex characters)
+        required: true
+      operation:
+        description: Explicit production operation; rollback never downgrades the database
+        type: choice
+        options: [deploy, rollback, remove-domain]
+        default: deploy
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: portfolio-application-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment: production
+    runs-on: ${{ vars.DEPLOY_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      DEPLOY_ACTION: ${{ inputs.operation }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+      ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Verify CI, manifest provenance, DNS and pinned SSH identity; backup, migrate and deploy
+        run: python infrastructure/automation.py deploy
+      - name: Deployment failure visibility
+        if: failure()
+        run: echo 'Production operation failed. Data volumes remain intact. Follow the reviewed rollback runbook; no schema downgrade is automatic.' >> "$GITHUB_STEP_SUMMARY"

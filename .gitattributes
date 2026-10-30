@@ -1,3 +1,6 @@
 
 # Linux deployment scripts must retain LF even from Windows checkouts.
 /deploy/*.sh text eol=lf
+/deploy/ops/*.sh text eol=lf
+/deploy/ops/*.py text eol=lf
+/infrastructure/terraform/*.sh text eol=lf

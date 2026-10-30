@@ -1,0 +1,57 @@
+name: Approved Terraform apply
+on:
+  workflow_dispatch:
+    inputs:
+      plan_run_id:
+        description: Successful reviewed Terraform plan run ID
+        required: true
+      expected_sha:
+        description: Exact reviewed master commit (40 hex characters)
+        required: true
+      plan_sha256:
+        description: Plan SHA256 copied from its sanitized review summary
+        required: true
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: portfolio-terraform-production
+  cancel-in-progress: false
+jobs:
+  apply:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PLAN_RUN_ID: ${{ inputs.plan_run_id }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      PLAN_SHA256: ${{ inputs.plan_sha256 }}
+      UPCLOUD_TOKEN: ${{ secrets.UPCLOUD_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.TF_STATE_REGION }}
+      AWS_EC2_METADATA_DISABLED: 'true'
+      TF_IN_AUTOMATION: 'true'
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
+      TF_STATE_KMS_KEY: ${{ vars.TF_STATE_KMS_KEY }}
+      TF_STATE_KEY: portfolio/production/terraform.tfstate
+      TF_VAR_zone: ${{ vars.UPCLOUD_ZONE }}
+      TF_VAR_plan: ${{ vars.UPCLOUD_PLAN }}
+      TF_VAR_deploy_user: ${{ vars.DEPLOY_USER }}
+      TF_VAR_ssh_allowed_cidrs: ${{ vars.SSH_ALLOWED_CIDRS }}
+      TF_VAR_deploy_ssh_public_key: ${{ vars.DEPLOY_SSH_PUBLIC_KEY }}
+      TF_VAR_operator_ssh_public_key: ${{ vars.OPERATOR_SSH_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: Apply only the exact approved saved plan; output IP and stop
+        run: python infrastructure/automation.py apply
+      - name: Failed provisioning visibility
+        if: failure()
+        run: echo 'Apply failed. Inspect UpCloud/state privately; never retry by destroying resources.' >> "$GITHUB_STEP_SUMMARY"

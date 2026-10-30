@@ -1,5 +1,10 @@
 # AI Product Demand Analyzer
 
+Production infrastructure preparation: [Phase 8A overview](docs/PHASE8A_INFRASTRUCTURE.md),
+[validation and remaining gates](docs/PHASE8A_VALIDATION.md), and
+[UpCloud/subdomain runbook](docs/UPCLOUD_RUNBOOK.md). Provisioning and deployment remain
+separate manual, reviewed operations; no cloud resources are created by local validation.
+
 Product demand analytics application with an Angular UI, a FastAPI backend, and PostgreSQL. The backend generates baseline forecasts for up to 30 days; the UI displays recorded sales, product catalogs, and completed forecast summaries.
 
 ## Projects

@@ -1,0 +1,32 @@
+# Overlay on compose.production.yml, never used by the standalone disposable validator.
+services:
+  db:
+    image: ${POSTGRES_IMAGE:?immutable image required}
+    volumes: !override
+      - database:/var/lib/postgresql/data
+      - /usr/local/lib/portfolio/init-db.sh:/docker-entrypoint-initdb.d/10-app.sh:ro
+  backend:
+    build: !reset null
+    image: ${BACKEND_IMAGE:?immutable image required}
+    networks: !override
+      private: {}
+      edge:
+        aliases: [demand-api]
+  migrate:
+    build: !reset null
+    image: ${BACKEND_IMAGE:?immutable image required}
+  frontend:
+    build: !reset null
+    image: ${FRONTEND_IMAGE:?immutable image required}
+    networks: !override
+      edge:
+        aliases: [demand-web]
+  proxy:
+    profiles: [standalone-only]
+    ports: !override []
+networks:
+  private:
+    internal: true
+  edge:
+    external: true
+    name: portfolio_demand_edge

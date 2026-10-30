@@ -1,0 +1,43 @@
+name: Terraform and deployment validation
+on:
+  push:
+    branches: [master]
+  pull_request:
+    paths: ['infrastructure/**', 'deploy/ops/**', '.github/workflows/**', 'compose.production.yml', '.gitattributes', '.gitignore']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - name: Terraform format and provider-schema validation (no cloud credentials)
+        working-directory: infrastructure/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false -lockfile=readonly
+          terraform validate
+          terraform test
+      - name: Security and workflow analysis
+        run: |
+          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.76.1 config --exit-code 1 --severity HIGH,CRITICAL /src/infrastructure/terraform
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12 -color
+          bash -n infrastructure/terraform/bootstrap.sh deploy/ops/*.sh
+          python -m pip install -r infrastructure/requirements-validation.txt
+          python -m pytest infrastructure/tests -q
+          ruff check infrastructure deploy/ops
+          ruff format --check infrastructure deploy/ops
+      - name: Shared VPS Compose contract
+        run: |
+          python infrastructure/validate_compose.py
+          python infrastructure/validate_caddy.py
+          python infrastructure/check_secrets.py

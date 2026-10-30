@@ -1,0 +1,42 @@
+#cloud-config
+disable_root: true
+ssh_pwauth: false
+package_update: true
+package_upgrade: true
+users:
+  - name: operator
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${operator_key}
+  - name: ${deploy_user}
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(root) NOPASSWD:/usr/local/sbin/portfolio-release
+    ssh_authorized_keys:
+      - ${deploy_key}
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-portfolio.conf
+    permissions: '0600'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      AllowUsers operator ${deploy_user}
+      MaxAuthTries 3
+      X11Forwarding no
+      AllowTcpForwarding no
+  - path: /usr/local/lib/portfolio/bootstrap.sh
+    permissions: '0700'
+    encoding: b64
+    content: ${bootstrap}
+%{ for target, content in files ~}
+  - path: ${target}
+    permissions: '${endswith(target, "/init-db.sh") ? "0644" : "0700"}'
+    encoding: b64
+    content: ${content}
+%{ endfor ~}
+runcmd:
+  - [bash, /usr/local/lib/portfolio/bootstrap.sh, '${ssh_cidrs}']

@@ -1,0 +1,5 @@
+# Native AWS S3, created separately. Credentials come only from AWS_* environment.
+bucket     = "REPLACE_WITH_PRIVATE_VERSIONED_STATE_BUCKET"
+key        = "portfolio/production/terraform.tfstate"
+region     = "REPLACE_WITH_STATE_REGION"
+kms_key_id = "REPLACE_WITH_STATE_KMS_KEY_ARN"

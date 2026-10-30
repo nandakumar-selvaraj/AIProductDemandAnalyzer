@@ -2,6 +2,12 @@
 
 Prepared for Linux Docker Compose; no deployment has been performed.
 
+Phase 8A adds reviewed infrastructure automation and a separate shared-ingress host
+profile. Start with [PHASE8A_INFRASTRUCTURE.md](PHASE8A_INFRASTRUCTURE.md),
+[UPCLOUD_RUNBOOK.md](UPCLOUD_RUNBOOK.md), [GitHub Environment setup](GITHUB_PRODUCTION_ENVIRONMENT.md)
+and [temporary hostname lifecycle](TEMPORARY_SUBDOMAIN.md). The standalone Phase 7 Compose
+workflow below remains unchanged. No provisioning/deployment is automatic on push.
+
 ## Phase 7C migration and restricted operations
 
 The production image includes the Admin Data Management page and owner-only API-token

@@ -1,0 +1,76 @@
+name: Verified production image publication
+on:
+  workflow_run:
+    workflows: ['Backend CI', 'E2E (synthetic PostgreSQL)', 'Disposable production Docker validation', 'Terraform and deployment validation']
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  packages: write
+concurrency:
+  group: verified-images-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' ||
+      github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Require all existing CI and infrastructure checks on this exact commit
+        run: python infrastructure/automation.py ci
+      - name: Set lowercase registry namespace
+        id: registry
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: backend
+        with:
+          context: backend
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.registry.outputs.prefix }}/backend:${{ env.EXPECTED_SHA }}
+          provenance: mode=min
+          sbom: true
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: frontend
+        with:
+          context: ui
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.registry.outputs.prefix }}/frontend:${{ env.EXPECTED_SHA }}
+          provenance: mode=min
+          sbom: true
+      - name: Scan every immutable runtime image and generate release manifest
+        env:
+          IMAGE_PREFIX: ${{ steps.registry.outputs.prefix }}
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+          POSTGRES_RUNTIME_IMAGE: ${{ vars.POSTGRES_RUNTIME_IMAGE || 'docker.io/library/postgres:16-alpine' }}
+          CADDY_RUNTIME_IMAGE: ${{ vars.CADDY_RUNTIME_IMAGE || 'docker.io/library/caddy:2-alpine' }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+        run: python infrastructure/images.py
+      - name: Publish non-secret digest manifest only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-manifest
+          path: release-manifest.json
+          retention-days: 30
+          if-no-files-found: error

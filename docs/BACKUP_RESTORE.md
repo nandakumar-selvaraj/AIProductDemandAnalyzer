@@ -1,5 +1,42 @@
 # Backup and restore
 
+## Phase 8A automated host recovery
+
+The standalone scripts below remain available for disposable/local validation. The new
+shared VPS uses root-owned `deploy/ops/operations.py` through backup/restore shell wrappers.
+Before any migration it streams pg_dump directly into Restic's authenticated client-side
+encryption in a separate HTTPS off-host S3 repository. It then runs Restic integrity checks,
+restores the latest tagged dump into a newly created `restore_verify_<time>_<pid>` database,
+queries its catalog, and deletes only that newly created verification database. It never
+drops/replaces an existing application database. Any failure blocks migration/deployment.
+
+Configure `/etc/portfolio/backup.env` and its Restic password file as root-owned 0600;
+use deploy/ops/backup.env.example. These are server-only credentials, distinct from
+UpCloud, GitHub SSH and Terraform-state identities. Approve/create backup storage and
+explicitly initialize its dedicated Restic repository before first deployment. No cloud
+backup bucket, credentials or repository were created in Phase 8A. Store the encryption
+passphrase in a separate encrypted recovery vault; losing it makes backups unusable.
+
+A systemd timer backs up daily with jitter, retaining 7 daily/4 weekly/3 monthly snapshots
+tagged `demand` in this app's dedicated repository. Retention/prune is intentionally
+confined to that backup repository; never share it with Terraform state or another app.
+Review retention/cost/recovery objectives before activation. Local monitoring rejects a
+backup older than 26 hours. Assign off-host alerting separately: timers/journald cannot
+report a completely failed VPS by themselves. Prove an off-host recovery in authorized
+Phase 8B; local standalone Docker restore success is not proof of real off-host access.
+
+For disaster recovery, stop writes, select the intended snapshot, restore to a NEW
+database/replacement stack, apply the private ACLs below, verify schema/row counts and
+application connectivity, then approve the connection cutover. Preserve the old database.
+Take signing/backup configuration from the separate vault, and rotate JWT signing keys
+if restoring old session/token rows could revive revoked access. Do not automatically
+restore over a running database, downgrade schema or remove volumes.
+
+Application rollback uses a previously successful image manifest and keeps the current
+database/schema/ingress/domain. Schema-incompatible releases require a forward fix or an
+explicit new-database restore/cutover, not an automatic migration downgrade. See
+[UpCloud runbook](UPCLOUD_RUNBOOK.md) and [state recovery](TERRAFORM_STATE.md).
+
 Scripts run on the Linux host from repository root using `.env.production` and
 `compose.production.yml`. They never target development or seed/reset data.
 
