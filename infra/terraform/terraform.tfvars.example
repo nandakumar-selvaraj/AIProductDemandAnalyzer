@@ -1,0 +1,6 @@
+server_plan           = "REPLACE-WITH-APPROVED-CATALOG-PLAN"
+ssh_public_key        = "ssh-ed25519 REPLACE-WITH-OPERATOR-PUBLIC-KEY"
+deploy_ssh_public_key = "ssh-ed25519 REPLACE-WITH-DISTINCT-DEPLOY-PUBLIC-KEY"
+ssh_allowed_cidrs     = ["203.0.113.10/32"] # Replace documentation address; include fixed runner egress.
+# upcloud_zone = "sg-sin1"
+# boot_storage_tier = "standard"

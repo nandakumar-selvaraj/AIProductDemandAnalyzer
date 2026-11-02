@@ -1,0 +1,110 @@
+name: demand-single
+x-backend: &backend
+  image: ${BACKEND_IMAGE:?immutable backend digest required}
+  environment: &api-env
+    ENVIRONMENT: production
+    DATABASE_URL: ${DATABASE_URL:?runtime demand_app URL required}
+    AUTH_ENABLED: "true"
+    JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?required}
+    JWT_ISSUER: ai-product-demand-analyzer
+    JWT_AUDIENCE: demand-analyzer-browser
+    AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:?HTTPS origins JSON required}
+    TRUSTED_HOSTS: ${TRUSTED_HOSTS:?domain and localhost JSON required}
+    AUTH_ACCESS_TOKEN_MINUTES: "30"
+    AUTH_LOGIN_REQUESTS_PER_MINUTE: "10"
+    PUBLIC_DEMO_ENABLED: "false"
+    AI_ENABLED: "false"
+    LOG_LEVEL: INFO
+  networks: [database, edge]
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 1536m
+  cpus: 1.25
+  pids_limit: 128
+  logging: &logging
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
+services:
+  db:
+    image: ${POSTGRES_IMAGE:?approved postgres 16 digest required}
+    environment:
+      POSTGRES_DB: demand
+      POSTGRES_USER: demand_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?owner password required}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?runtime password required}
+    networks: [database]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/10-app.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U demand_owner -d demand']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *logging
+  migrate:
+    <<: *backend
+    environment:
+      <<: *api-env
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?owner URL required}
+    command: [alembic, upgrade, head]
+    restart: "no"
+    depends_on:
+      db: {condition: service_healthy}
+  backend:
+    <<: *backend
+    restart: unless-stopped
+    stop_grace_period: 40s
+    depends_on:
+      db: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+  frontend:
+    image: ${FRONTEND_IMAGE:?immutable frontend digest required}
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp:size=32m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logging
+  nginx:
+    image: ${NGINX_IMAGE:?approved nginx unprivileged digest required}
+    ports: ["80:8080", "443:8443"]
+    networks: [edge]
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/demand/tls:/etc/nginx/tls:ro
+      - /var/lib/letsencrypt:/var/lib/letsencrypt:ro
+    read_only: true
+    tmpfs: [/tmp:size=32m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logging
+    depends_on:
+      backend: {condition: service_healthy}
+      frontend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  database: {internal: true}
+  edge:
+volumes:
+  database:
+    external: true
+    name: demand-single-database

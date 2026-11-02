@@ -4,3 +4,5 @@
 /deploy/ops/*.sh text eol=lf
 /deploy/ops/*.py text eol=lf
 /infrastructure/terraform/*.sh text eol=lf
+/deploy/single/*.sh text eol=lf
+/deploy/single/*.py text eol=lf

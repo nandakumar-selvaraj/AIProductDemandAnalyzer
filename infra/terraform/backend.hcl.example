@@ -1,0 +1,5 @@
+# Existing approved AWS S3 bucket only. Credentials via environment, never this file.
+bucket     = "REPLACE-approved-private-versioned-state-bucket"
+key        = "aiproductdemand/production/terraform.tfstate"
+region     = "REPLACE-approved-aws-region"
+kms_key_id = "REPLACE-approved-kms-key-arn"

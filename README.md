@@ -1,9 +1,12 @@
 # AI Product Demand Analyzer
 
-Production infrastructure preparation: [Phase 8A overview](docs/PHASE8A_INFRASTRUCTURE.md),
-[validation and remaining gates](docs/PHASE8A_VALIDATION.md), and
-[UpCloud/subdomain runbook](docs/UPCLOUD_RUNBOOK.md). Provisioning and deployment remain
-separate manual, reviewed operations; no cloud resources are created by local validation.
+Dedicated application deployment preparation: [architecture](docs/deployment/ARCHITECTURE.md),
+[implementation report](docs/deployment/IMPLEMENTATION_REPORT.md), and
+[validation and remaining gates](docs/deployment/ACCEPTANCE.md). All four dedicated runtime images
+now pass the HIGH/CRITICAL security gate; see [remediation evidence](docs/deployment/IMAGE_SECURITY.md).
+Provisioning and deployment require separate explicit approval.
+Existing shared-portfolio tooling is documented in the [Phase 8A overview](docs/PHASE8A_INFRASTRUCTURE.md);
+do not provision both infrastructure paths for this application.
 
 Product demand analytics application with an Angular UI, a FastAPI backend, and PostgreSQL. The backend generates baseline forecasts for up to 30 days; the UI displays recorded sales, product catalogs, and completed forecast summaries.
 
@@ -69,3 +72,14 @@ ui/                  Angular application, API services, and frontend tests
 ```
 
 Keep credentials in local backend configuration. Generated output, dependencies, and downloaded datasets are excluded by the root `.gitignore`.
+
+## Dedicated UpCloud deployment preparation
+
+The single-application deployment path is documented in
+[docs/deployment/ARCHITECTURE.md](docs/deployment/ARCHITECTURE.md), with
+[validation and live acceptance gates](docs/deployment/ACCEPTANCE.md) and the
+[implementation report](docs/deployment/IMPLEMENTATION_REPORT.md).
+It uses `infra/terraform`, `compose.prod.yml`, `deploy/single`, and `single-*` workflows.
+Existing shared-portfolio deployment tooling remains available separately. Do not provision
+both paths for this application. Cloud provisioning, production account creation and deployment
+require separate explicit approval.

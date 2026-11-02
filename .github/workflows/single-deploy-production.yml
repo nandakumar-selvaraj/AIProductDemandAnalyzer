@@ -1,0 +1,116 @@
+name: Approved dedicated application deployment
+on:
+  workflow_dispatch:
+    inputs:
+      schema_compatible:
+        description: Migrations reviewed as backward compatible with the previous application release
+        type: boolean
+        default: false
+        required: true
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: aiproductdemand-application-production
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/master' && inputs.schema_compatible
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    outputs:
+      backend: ${{ steps.images.outputs.backend }}
+      frontend: ${{ steps.images.outputs.frontend }}
+      postgres: ${{ steps.images.outputs.postgres }}
+      nginx: ${{ steps.images.outputs.nginx }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Require existing tests and Angular production build on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: python infrastructure/automation.py ci
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: backend
+        with:
+          context: backend
+          push: true
+          platforms: linux/amd64
+          tags: ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/backend:${{ github.sha }}
+          provenance: mode=min
+          sbom: true
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: frontend
+        with:
+          context: ui
+          push: true
+          platforms: linux/amd64
+          tags: ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/frontend:${{ github.sha }}
+          provenance: mode=min
+          sbom: true
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        id: postgres
+        with:
+          context: deploy/postgres
+          push: true
+          platforms: linux/amd64
+          tags: ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/postgres:${{ github.sha }}
+          provenance: mode=min
+          sbom: true
+      - name: Resolve and scan immutable runtime images
+        id: images
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+          POSTGRES_DIGEST: ${{ steps.postgres.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          backend="ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/backend@$BACKEND_DIGEST"
+          frontend="ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/frontend@$FRONTEND_DIGEST"
+          postgres="ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/postgres@$POSTGRES_DIGEST"
+          nginx=$(python -c 'import json; print(json.load(open("deploy/single/images.json"))["nginx"])')
+          docker pull "$nginx"
+          docker run --rm "$postgres" postgres --version | grep -E '^postgres \(PostgreSQL\) 16\.'
+          for image in "$backend" "$frontend" "$postgres" "$nginx"; do
+            docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD aquasec/trivy:0.76.1 image --exit-code 1 --severity HIGH,CRITICAL "$image"
+          done
+          printf 'backend=%s\nfrontend=%s\npostgres=%s\nnginx=%s\n' "$backend" "$frontend" "$postgres" "$nginx" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2016
+          printf 'Reviewed commit: `%s`\n\nBackend: `%s`\n\nFrontend: `%s`\n\nPostgreSQL: `%s`\n\nNginx: `%s`\n' "$GITHUB_SHA" "$backend" "$frontend" "$postgres" "$nginx" >> "$GITHUB_STEP_SUMMARY"
+  deploy:
+    needs: build
+    environment: production
+    # Isolated runner with fixed egress; never the production VPS and no internet-wide SSH.
+    runs-on: ${{ vars.SINGLE_DEPLOY_RUNNER_LABEL || 'demand-fixed-egress-not-configured' }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SCHEMA_COMPATIBLE: ${{ inputs.schema_compatible }}
+      DEPLOY_HOST: ${{ vars.SINGLE_DEPLOY_HOST }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      BACKEND_IMAGE: ${{ needs.build.outputs.backend }}
+      FRONTEND_IMAGE: ${{ needs.build.outputs.frontend }}
+      POSTGRES_IMAGE: ${{ needs.build.outputs.postgres }}
+      NGINX_IMAGE: ${{ needs.build.outputs.nginx }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify protection and CI, then backup, migrate, deploy and check HTTPS
+        run: python infra/deploy_transport.py

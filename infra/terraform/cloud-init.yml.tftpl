@@ -1,0 +1,87 @@
+#cloud-config
+timezone: ${timezone}
+disable_root: true
+ssh_pwauth: false
+package_update: true
+package_upgrade: true
+packages: [docker.io, docker-compose-v2, unattended-upgrades, ufw, restic, certbot]
+users:
+  - name: operator
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${operator_key}
+  - name: deployer
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: ALL=(root) NOPASSWD:/usr/local/sbin/demand-release
+    ssh_authorized_keys:
+      - ${deploy_key}
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-demand-initial.conf
+    permissions: '0600'
+    content: |
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      AllowUsers operator deployer
+      AllowAgentForwarding no
+      X11Forwarding no
+      MaxAuthTries 3
+      Match User deployer
+        AllowTcpForwarding no
+        PermitTTY no
+        ForceCommand sudo -n /usr/local/sbin/demand-release
+      Match all
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: '0644'
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  - path: /etc/systemd/journald.conf.d/demand.conf
+    permissions: '0644'
+    content: |
+      [Journal]
+      Storage=persistent
+      SystemMaxUse=200M
+  - path: /etc/systemd/system/demand-backup.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Encrypted demand PostgreSQL backup
+      ConditionPathExists=/etc/demand/backup.env
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/demand/backup.sh
+      UMask=0077
+  - path: /etc/systemd/system/demand-backup.timer
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Daily demand database backup
+      [Timer]
+      OnCalendar=*-*-* 02:00:00 UTC
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+%{ for target, content in files ~}
+  - path: ${target}
+    permissions: '${endswith(target, ".conf") || endswith(target, "/init-db.sh") ? "0644" : endswith(target, ".sh") || endswith(target, "demand-release") || endswith(target, "demand-harden-ssh") ? "0700" : "0600"}'
+    encoding: b64
+    content: ${content}
+%{ endfor ~}
+runcmd:
+  - [install, -d, -m, '0700', /etc/demand, /var/lib/demand/releases]
+  - [sh, -c, 'chown -R root:root /opt/demand; chmod 0700 /opt/demand; cp /opt/demand/nginx.stage-a.conf /opt/demand/nginx.conf']
+  - [ufw, default, deny, incoming]
+  - [ufw, default, allow, outgoing]
+%{ for cidr in ssh_cidrs ~}
+  - [ufw, allow, from, '${cidr}', to, any, port, '22', proto, tcp]
+%{ endfor ~}
+  - [ufw, allow, '80/tcp']
+  - [ufw, allow, '443/tcp']
+  - [ufw, --force, enable]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, daemon-reload]
+  # Backup timer is enabled manually only after off-host configuration + restore drill.
+  - [sh, -c, 'sshd -t && systemctl reload ssh']
