@@ -1,5 +1,7 @@
 # AI Product Demand Analyzer
 
+Deployment readiness (Phase 5.16): [readiness report](docs/deployment/PHASE_5_16_READINESS.md), [dedicated vs shared infrastructure](docs/deployment/DEDICATED_VS_SHARED.md), [Terraform state decision](docs/deployment/TERRAFORM_STATE_DECISION.md).
+
 Dedicated application deployment preparation: [architecture](docs/deployment/ARCHITECTURE.md),
 [implementation report](docs/deployment/IMPLEMENTATION_REPORT.md), and
 [validation and remaining gates](docs/deployment/ACCEPTANCE.md). All four dedicated runtime images

@@ -9,16 +9,39 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from infra import guards  # noqa: E402
 from infrastructure import automation as shared  # noqa: E402
+
+
+def validate_transport(env):
+    """Reject unpinned hosts, non-Ed25519 identities and non-public targets before any SSH use."""
+    ip = ipaddress.IPv4Address(env["DEPLOY_HOST"])
+    if not ip.is_global or env.get("SCHEMA_COMPATIBLE") != "true":
+        raise ValueError("Public target and explicit schema review required")
+    key = env["DEPLOY_SSH_PRIVATE_KEY"].strip()
+    if not key.startswith("-----BEGIN OPENSSH PRIVATE KEY-----"):
+        raise ValueError("OpenSSH private key required")
+    pinned = [
+        line.split()
+        for line in env["DEPLOY_SSH_KNOWN_HOSTS"].splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+    if not pinned or any(
+        len(fields) < 3
+        or fields[0] != str(ip)
+        or fields[1] != "ssh-ed25519"
+        or fields[0].startswith(("@", "|"))
+        for fields in pinned
+    ):
+        raise ValueError("Known hosts must pin only the exact Ed25519 deployment host")
+    return ip
 
 
 def main():
     shared.protected_environment()
     shared.required("DEPLOY_HOST", "DEPLOY_SSH_PRIVATE_KEY", "DEPLOY_SSH_KNOWN_HOSTS")
-    ip = ipaddress.IPv4Address(os.environ["DEPLOY_HOST"])
-    if not ip.is_global or os.environ.get("SCHEMA_COMPATIBLE") != "true":
-        raise ValueError("Public target and explicit schema review required")
-    shared.WORKFLOWS.append("single-validate.yml")
+    ip = validate_transport(os.environ)
+    shared.WORKFLOWS[:] = guards.REQUIRED_CI
     shared.ci(os.environ["GITHUB_SHA"])
     repositories = {
         "BACKEND_IMAGE": "ghcr.io/nandakumar-selvaraj/aiproductdemandanalyzer/backend",

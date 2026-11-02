@@ -1,3 +1,4 @@
+# OUT OF SCOPE: shared-portfolio infrastructure. Not authorized for AIProductDemandAnalyzer; use single-*.yml workflows instead.
 name: Approved Terraform apply
 on:
   workflow_dispatch:

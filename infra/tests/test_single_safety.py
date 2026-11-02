@@ -141,7 +141,7 @@ def test_failure_preserves_release_and_does_not_downgrade(
         Path,
         "is_file",
         lambda path: True
-        if str(path) == "/etc/demand/tls-ready"
+        if path.as_posix() == "/etc/demand/tls-ready"
         else real_is_file(path),
     )
     monkeypatch.setattr(release.sys, "argv", ["demand-release"])

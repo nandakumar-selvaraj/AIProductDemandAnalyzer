@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from infra import guards  # noqa: E402
 from infrastructure import automation as shared  # noqa: E402
 
 shared.TF = ROOT / "infra/terraform"
@@ -38,27 +39,18 @@ def fingerprint():
         "TF_STATE_KEY",
     ]
     shared.required(*names)
-    if os.environ["TF_STATE_KEY"] != "aiproductdemand/production/terraform.tfstate":
-        raise ValueError("Dedicated state key required; never reuse shared VPS state")
+    guards.require_dedicated(os.environ, shared.TF)
     values = {name: os.environ[name] for name in names}
     values["operation"] = MODE
     return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
 
 
 def summary(document):
-    changes = []
-    allowed = {"upcloud_server.app", "upcloud_firewall_rules.app"}
-    for item in document.get("resource_changes", []):
-        address, actions = item["address"], item["change"]["actions"]
-        if address not in allowed:
-            raise ValueError("Unexpected or duplicate infrastructure resource")
-        if MODE == "destroy":
-            if actions not in (["delete"], ["no-op"]):
-                raise ValueError("Destroy plan contains a non-delete operation")
-        elif "delete" in actions:
-            raise ValueError("Deletion/replacement forbidden in normal workflow")
-        changes.append({"resource": address, "actions": actions})
-    return changes
+    return guards.validate_plan(document, destroy=MODE == "destroy")
+
+
+def object_path(run_id, name):
+    return guards.plan_object_path(os.environ["TF_STATE_BUCKET"], run_id, name)
 
 
 def run(args, **kwargs):
@@ -86,6 +78,8 @@ def configure(mode):
     shared.safe_summary = summary
     shared.run = run
     shared.verify_run = verify
+    shared.object_path = object_path
+    shared.WORKFLOWS[:] = guards.REQUIRED_CI
 
 
 def destroy_apply():
@@ -102,7 +96,7 @@ def destroy_apply():
                     "aws",
                     "s3",
                     "cp",
-                    shared.object_path(os.environ["PLAN_RUN_ID"], name),
+                    object_path(os.environ["PLAN_RUN_ID"], name),
                     str(path),
                     "--only-show-errors",
                 ]
@@ -139,11 +133,14 @@ def destroy_apply():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["plan", "apply", "destroy-plan", "destroy-apply"]
+        "action", choices=["plan", "apply", "destroy-plan", "destroy-apply", "ci"]
     )
     args = parser.parse_args()
     try:
         configure("destroy" if args.action.startswith("destroy") else "normal")
+        if args.action == "ci":
+            shared.ci(os.environ["EXPECTED_SHA"])
+            raise SystemExit(0)
         if MODE == "destroy":
             if os.environ.get("BACKUP_CONFIRMATION") != "OFFHOST-RESTORE-VERIFIED":
                 raise ValueError(

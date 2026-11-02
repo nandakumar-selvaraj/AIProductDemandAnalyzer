@@ -15,7 +15,7 @@ Tests use mock providers. Ordinary cloud-backed planning is not an offline test;
 
 An existing separately approved AWS S3 bucket is mandatory: versioned, all public access blocked, TLS-only policy, SSE-KMS specified key, restricted IAM prefixes, audit logging, S3 `.tflock` locking. Workflow checks versioning/public block/KMS settings; operator verifies policies, IAM and recovery access. Nothing provisions this backend. No local-state fallback is enabled.
 
-State key is `aiproductdemand/production/terraform.tfstate`, separate from shared portfolio. Scope IAM Get/Put to state, Get/Put/Delete to its lock, reviewed plans to `reviewed-plans/`, and appropriate KMS operations. Ordinary CI should not delete state. Protect versions/backups and expire private saved plans under reviewed retention. Never publish state/plans as Actions artifacts.
+State key is `aiproductdemand/production/terraform.tfstate`, separate from shared portfolio. Scope IAM Get/Put to state, Get/Put/Delete to its lock, reviewed plans to `reviewed-plans/aiproductdemand/` (project-scoped since Phase 5.16), and appropriate KMS operations. Ordinary CI should not delete state. Protect versions/backups and expire private saved plans under reviewed retention. Never publish state/plans as Actions artifacts.
 
 Workflow concurrency, backend lock and saved-plan state lineage/serial checks prevent concurrent writes. Commit/config/backend fingerprint, lockfile hash, plan hash, trusted workflow run and age are checked. Normal plans reject deletes/replacements/unrecognized resources. Apply uses the exact saved plan. Normal plans expire after 24 hours; destroy after one hour.
 
