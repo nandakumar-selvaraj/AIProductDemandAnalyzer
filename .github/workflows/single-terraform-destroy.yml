@@ -2,7 +2,7 @@ name: Single app Terraform destroy
 on:
   workflow_dispatch:
     inputs:
-      environment: {description: Explicit teardown environment, type: choice, options: [production], required: true}
+      environment: {description: Explicit teardown environment, type: choice, options: [aiproductdemand-production], required: true}
       operation: {description: First plan then review and separately apply within one hour, type: choice, options: [destroy-plan, destroy-apply], required: true}
       backup_confirmation: {description: Type OFFHOST-RESTORE-VERIFIED after backup restore and inventory review, required: true}
       expected_sha: {description: Reviewed teardown commit removing prevent_destroy, required: true}
@@ -17,36 +17,38 @@ concurrency:
   cancel-in-progress: false
 jobs:
   operation:
-    environment: production
+    environment: aiproductdemand-production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      UPCLOUD_TOKEN: ${{ secrets.UPCLOUD_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ vars.TF_STATE_REGION }}
+      DEPLOYMENT_ENVIRONMENT: aiproductdemand-production
+      UPCLOUD_TOKEN: ${{ secrets.AIPD_UPCLOUD_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AIPD_TF_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AIPD_TF_STATE_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.AIPD_TF_STATE_REGION }}
       AWS_EC2_METADATA_DISABLED: 'true'
       TF_IN_AUTOMATION: 'true'
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
-      TF_STATE_KMS_KEY: ${{ vars.TF_STATE_KMS_KEY }}
+      TF_STATE_BUCKET: ${{ vars.AIPD_TF_STATE_BUCKET }}
+      TF_STATE_REGION: ${{ vars.AIPD_TF_STATE_REGION }}
+      TF_STATE_KMS_KEY: ${{ vars.AIPD_TF_STATE_KMS_KEY }}
       TF_STATE_KEY: aiproductdemand/production/terraform.tfstate
       TF_VAR_project_name: aiproductdemand
       TF_VAR_environment: production
-      TF_VAR_upcloud_zone: ${{ vars.SINGLE_UPCLOUD_ZONE || 'sg-sin1' }}
+      TF_VAR_upcloud_zone: ${{ vars.SINGLE_UPCLOUD_ZONE }}
       TF_VAR_server_plan: ${{ vars.SINGLE_UPCLOUD_PLAN }}
       TF_VAR_server_hostname: aiproductdemand-prod
       TF_VAR_ssh_public_key: ${{ vars.SINGLE_OPERATOR_PUBLIC_KEY }}
       TF_VAR_deploy_ssh_public_key: ${{ vars.SINGLE_DEPLOY_PUBLIC_KEY }}
       TF_VAR_ssh_allowed_cidrs: ${{ vars.SINGLE_SSH_ALLOWED_CIDRS }}
       TF_VAR_server_timezone: Etc/UTC
-      TF_VAR_boot_storage_tier: ${{ vars.SINGLE_STORAGE_TIER || 'standard' }}
+      TF_VAR_boot_storage_tier: ${{ vars.SINGLE_STORAGE_TIER }}
       PLAN_RUN_ID: ${{ inputs.plan_run_id }}
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       PLAN_SHA256: ${{ inputs.plan_sha256 }}
       BACKUP_CONFIRMATION: ${{ inputs.backup_confirmation }}
       TF_OPERATION: ${{ inputs.operation }}
+      DESTROY_TARGET: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

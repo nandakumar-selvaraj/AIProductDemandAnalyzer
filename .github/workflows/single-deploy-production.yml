@@ -94,16 +94,18 @@ jobs:
           printf 'Reviewed commit: `%s`\n\nBackend: `%s`\n\nFrontend: `%s`\n\nPostgreSQL: `%s`\n\nNginx: `%s`\n' "$GITHUB_SHA" "$backend" "$frontend" "$postgres" "$nginx" >> "$GITHUB_STEP_SUMMARY"
   deploy:
     needs: build
-    environment: production
+    environment: aiproductdemand-production
     # Isolated runner with fixed egress; never the production VPS and no internet-wide SSH.
     runs-on: ${{ vars.SINGLE_DEPLOY_RUNNER_LABEL || 'demand-fixed-egress-not-configured' }}
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
+      DEPLOYMENT_ENVIRONMENT: aiproductdemand-production
       SCHEMA_COMPATIBLE: ${{ inputs.schema_compatible }}
       DEPLOY_HOST: ${{ vars.SINGLE_DEPLOY_HOST }}
-      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.AIPD_DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.AIPD_DEPLOY_SSH_KNOWN_HOSTS }}
+      DEPLOY_HOST_KEY_FINGERPRINT: ${{ vars.SINGLE_DEPLOY_HOST_KEY_FINGERPRINT }}
       BACKEND_IMAGE: ${{ needs.build.outputs.backend }}
       FRONTEND_IMAGE: ${{ needs.build.outputs.frontend }}
       POSTGRES_IMAGE: ${{ needs.build.outputs.postgres }}

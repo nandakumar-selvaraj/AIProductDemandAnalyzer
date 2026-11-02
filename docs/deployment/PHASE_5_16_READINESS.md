@@ -1,5 +1,7 @@
 # Phase 5.16 deployment readiness report
 
+> **Superseded in part by [Phase 5.16.1](PHASE_5_16_1_SECURITY_HARDENING.md).** Dedicated workflows now use the `aiproductdemand-production` Environment and `AIPD_*` secret and variable names (section F below is historical). Plan policy is now complete-inventory and exact-match, and transport pins a host-key fingerprint. Infrastructure tests: 212 passed.
+
 Scope: source changes, local tests and documentation only. No Terraform plan/apply/destroy, no cloud or AWS call, no GitHub setting change, no production deployment, no administrator creation, no secret read. Local passes are **not** deployment approval.
 
 **Status: BLOCKED for deployment** (owner prerequisites below). **READY FOR REVIEW** as a source change.

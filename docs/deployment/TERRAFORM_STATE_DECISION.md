@@ -23,6 +23,23 @@ Status: **recommendation only. No backend was created, initialized or migrated.*
 
 Reasons: the workflows already verify versioning, public-access block and KMS on every run, the saved-plan protocol depends on the same bucket, and no code changes are needed. Option B needs new reviewed code and has unverified lock semantics. Option C is allowed only for a supervised, offline dry run and must never be used for the real deployment. There is no silent fallback; the backend block has no local default.
 
+## Shared bucket, separate prefixes (Phase 5.16.1)
+
+Reusing the portfolio bucket with a separate key is acceptable **only** with a dedicated IAM principal whose policy is limited to this project's prefixes and key. With one shared credential, either project could read or overwrite the other's state, and a compromise of one exposes both. A separate bucket is simpler to reason about and costs about the same, so it is preferred when one is being created anyway.
+
+Minimum policy for the dedicated principal (credentials go only into `AIPD_TF_STATE_*` in the `aiproductdemand-production` Environment):
+
+| Purpose | Actions | Resource |
+|---|---|---|
+| Pre-flight bucket checks (`state_init`) | `s3:GetBucketVersioning`, `s3:GetBucketPublicAccessBlock`, `s3:GetEncryptionConfiguration` | `arn:aws:s3:::BUCKET` |
+| Listing (Terraform S3 backend) | `s3:ListBucket`, with condition `s3:prefix` limited to `aiproductdemand/production/*` and `reviewed-plans/aiproductdemand/*` | `arn:aws:s3:::BUCKET` |
+| State read/write | `s3:GetObject`, `s3:PutObject` | `arn:aws:s3:::BUCKET/aiproductdemand/production/terraform.tfstate` |
+| Lockfile | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `arn:aws:s3:::BUCKET/aiproductdemand/production/terraform.tfstate.tflock` |
+| Reviewed plans | `s3:GetObject`, `s3:PutObject` | `arn:aws:s3:::BUCKET/reviewed-plans/aiproductdemand/*` |
+| Encryption | `kms:Encrypt`, `kms:Decrypt`, `kms:GenerateDataKey`, `kms:DescribeKey` | the one KMS key ARN |
+
+No `s3:DeleteObject` on state, no `s3:PutBucket*` and no `kms:*Key*Policy`. The bucket policy should deny non-TLS access and unencrypted puts. Add a lifecycle rule expiring `reviewed-plans/aiproductdemand/` after the review window. Confirm the exact action names against the current Terraform S3 backend and AWS IAM docs before use.
+
 ## Not done / still required
 
 * Confirm bucket, region, KMS key ARN and IAM policy exist (`UNVERIFIED`).

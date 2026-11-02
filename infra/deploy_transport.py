@@ -18,28 +18,22 @@ def validate_transport(env):
     ip = ipaddress.IPv4Address(env["DEPLOY_HOST"])
     if not ip.is_global or env.get("SCHEMA_COMPATIBLE") != "true":
         raise ValueError("Public target and explicit schema review required")
-    key = env["DEPLOY_SSH_PRIVATE_KEY"].strip()
-    if not key.startswith("-----BEGIN OPENSSH PRIVATE KEY-----"):
-        raise ValueError("OpenSSH private key required")
-    pinned = [
-        line.split()
-        for line in env["DEPLOY_SSH_KNOWN_HOSTS"].splitlines()
-        if line.strip() and not line.startswith("#")
-    ]
-    if not pinned or any(
-        len(fields) < 3
-        or fields[0] != str(ip)
-        or fields[1] != "ssh-ed25519"
-        or fields[0].startswith(("@", "|"))
-        for fields in pinned
-    ):
-        raise ValueError("Known hosts must pin only the exact Ed25519 deployment host")
+    guards.ed25519_private_key(env["DEPLOY_SSH_PRIVATE_KEY"])
+    guards.pinned_host(
+        env["DEPLOY_SSH_KNOWN_HOSTS"], ip, env.get("DEPLOY_HOST_KEY_FINGERPRINT")
+    )
     return ip
 
 
 def main():
-    shared.protected_environment()
-    shared.required("DEPLOY_HOST", "DEPLOY_SSH_PRIVATE_KEY", "DEPLOY_SSH_KNOWN_HOSTS")
+    guards.require_workflow(os.environ, "deploy")
+    guards.require_environment(os.environ, shared.github)
+    shared.required(
+        "DEPLOY_HOST",
+        "DEPLOY_SSH_PRIVATE_KEY",
+        "DEPLOY_SSH_KNOWN_HOSTS",
+        "DEPLOY_HOST_KEY_FINGERPRINT",
+    )
     ip = validate_transport(os.environ)
     shared.WORKFLOWS[:] = guards.REQUIRED_CI
     shared.ci(os.environ["GITHUB_SHA"])
@@ -78,6 +72,18 @@ def main():
                 "BatchMode=yes",
                 "-o",
                 "ForwardAgent=no",
+                "-o",
+                "ForwardX11=no",
+                "-o",
+                "ClearAllForwardings=yes",
+                "-o",
+                "PasswordAuthentication=no",
+                "-o",
+                "KbdInteractiveAuthentication=no",
+                "-o",
+                "PreferredAuthentications=publickey",
+                "-o",
+                "RequestTTY=no",
                 "-o",
                 "StrictHostKeyChecking=yes",
                 "-o",

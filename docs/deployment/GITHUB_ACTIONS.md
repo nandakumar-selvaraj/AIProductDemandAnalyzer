@@ -8,9 +8,17 @@ Existing workflows are unchanged. Do not dispatch old shared VPS apply/deploy wo
 | `single-terraform-plan.yml` | Manual protected environment: approved state/catalog checks, encrypted private saved plan and sanitized review summary |
 | `single-terraform-apply.yml` | Manual approval: exact plan run, commit/config/lockfile/digest/age/state verification; provision and stop |
 | `single-deploy-production.yml` | Manual master: require exact-commit existing backend/Angular/E2E/Docker/infra CI, build/publish backend/frontend/repaired PostgreSQL in GHCR, require PostgreSQL major16 and scan all four runtime digests; separate approved fixed-egress SSH deployment job |
-| `single-terraform-destroy.yml` | Manual production selection; destroy-plan followed by separate dispatch/approval of exact destroy-apply within one hour, with backup/restore/inventory confirmation |
+| `single-terraform-destroy.yml` | Manual `aiproductdemand-production` selection; destroy-plan followed by separate dispatch/approval of exact destroy-apply within one hour, with backup/restore/inventory confirmation |
 
-`production` Environment MUST require independent reviewers, prevent self-review, disable admin bypass and allow only custom `master` branch policy. Protect branch/secrets. Python verifies settings via GitHub API before cloud/deployment operations; YAML cannot create reviewer protection. If repository plan lacks support, live operations remain BLOCKED.
+Dedicated jobs run in the **`aiproductdemand-production`** Environment (Phase 5.16.1); shared workflows keep `production`, unchanged. That Environment must require independent reviewers, prevent self-review, disable admin bypass and allow only a custom `master` branch policy.
+
+Before any state, cloud or SSH command, `infra/guards.py` checks three things:
+
+* `DEPLOYMENT_ENVIRONMENT` is the dedicated name (`production` is rejected);
+* those protections, through the GitHub API;
+* `GITHUB_WORKFLOW_REF` is the operation's own `single-*.yml` on `master`.
+
+YAML cannot create reviewer protection. If the repository's plan lacks support, live operations remain BLOCKED. See the [setup checklist](PHASE_5_16_1_SECURITY_HARDENING.md).
 
 Only build job has package-write permission; deployment has read-only repository/actions/deployment permissions. State credentials are scoped to Terraform jobs. `SINGLE_DEPLOY_RUNNER_LABEL` selects an isolated Linux runner with Python/SSH and approved fixed egress, never the VPS. Missing label selects an intentionally nonexistent runner. Review build digests/schema compatibility before deployment approval. Transport also requires the new single-validate workflow to pass before SSH.
 

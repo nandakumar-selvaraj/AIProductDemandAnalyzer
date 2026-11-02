@@ -17,6 +17,15 @@ An existing separately approved AWS S3 bucket is mandatory: versioned, all publi
 
 State key is `aiproductdemand/production/terraform.tfstate`, separate from shared portfolio. Scope IAM Get/Put to state, Get/Put/Delete to its lock, reviewed plans to `reviewed-plans/aiproductdemand/` (project-scoped since Phase 5.16), and appropriate KMS operations. Ordinary CI should not delete state. Protect versions/backups and expire private saved plans under reviewed retention. Never publish state/plans as Actions artifacts.
 
+Phase 5.16.1 plan policy (`infra/guards.py`) checks both `resource_changes` and `planned_values`, including no-op resources and rejecting child modules. It requires exactly `upcloud_server.app` and `upcloud_firewall_rules.app` and an exact match on:
+
+* zone (code allowlist `sg-sin1`), plan, hostname and labels;
+* encrypted 30 GB Ubuntu 24.04 boot storage with the approved tier;
+* password login disabled and one public IPv4 interface;
+* the complete ordered firewall rule list derived from the approved SSH CIDRs.
+
+Unknown security-critical values fail closed. Destroy has a separate delete-only policy. Saved-plan metadata binds the Environment, prefix, state key and state lineage/serial.
+
 Workflow concurrency, backend lock and saved-plan state lineage/serial checks prevent concurrent writes. Commit/config/backend fingerprint, lockfile hash, plan hash, trusted workflow run and age are checked. Normal plans reject deletes/replacements/unrecognized resources. Apply uses the exact saved plan. Normal plans expire after 24 hours; destroy after one hour.
 
 After approval only, fill ignored `backend.hcl` from example and use process credentials: `terraform init -backend-config=backend.hcl`. Runtime secrets never enter Terraform/cloud-init/plan. Git ignores state, backup files, plans, real tfvars/backend/env/private keys.

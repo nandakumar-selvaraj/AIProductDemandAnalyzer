@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from infra import automation
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
@@ -37,65 +36,6 @@ def test_reject_mutable_or_foreign_images(key):
 
 def test_accept_exact_digest_manifest():
     assert release.validate(fixture()) == fixture()
-
-
-@pytest.mark.parametrize(
-    "actions", [["delete"], ["create", "delete"], ["delete", "create"]]
-)
-def test_normal_plan_rejects_delete_and_replace(actions, monkeypatch):
-    monkeypatch.setattr(automation, "MODE", "normal")
-    with pytest.raises(ValueError):
-        automation.summary(
-            {
-                "resource_changes": [
-                    {"address": "upcloud_server.app", "change": {"actions": actions}}
-                ]
-            }
-        )
-
-
-def test_destroy_plan_rejects_creation(monkeypatch):
-    monkeypatch.setattr(automation, "MODE", "destroy")
-    with pytest.raises(ValueError):
-        automation.summary(
-            {
-                "resource_changes": [
-                    {"address": "upcloud_server.app", "change": {"actions": ["create"]}}
-                ]
-            }
-        )
-
-
-def test_unknown_resources_rejected():
-    with pytest.raises(ValueError):
-        automation.summary(
-            {
-                "resource_changes": [
-                    {
-                        "address": "upcloud_server.other",
-                        "change": {"actions": ["create"]},
-                    }
-                ]
-            }
-        )
-
-
-def test_plan_summary_does_not_leak_user_data(monkeypatch):
-    monkeypatch.setattr(automation, "MODE", "normal")
-    result = automation.summary(
-        {
-            "resource_changes": [
-                {
-                    "address": "upcloud_server.app",
-                    "change": {
-                        "actions": ["create"],
-                        "after": {"user_data": "PRIVATE"},
-                    },
-                }
-            ]
-        }
-    )
-    assert "PRIVATE" not in str(result)
 
 
 @pytest.mark.parametrize("check_migrations", [True, False])

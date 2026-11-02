@@ -24,12 +24,17 @@ write_files:
     content: |
       PermitRootLogin no
       PubkeyAuthentication yes
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      AuthenticationMethods publickey
       AllowUsers operator deployer
       AllowAgentForwarding no
       X11Forwarding no
       MaxAuthTries 3
       Match User deployer
         AllowTcpForwarding no
+        AllowStreamLocalForwarding no
+        PermitTunnel no
         PermitTTY no
         ForceCommand sudo -n /usr/local/sbin/demand-release
       Match all

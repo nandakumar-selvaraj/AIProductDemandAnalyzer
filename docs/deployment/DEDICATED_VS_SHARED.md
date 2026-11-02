@@ -13,17 +13,20 @@ Authorized scope: **one UpCloud VPS for AIProductDemandAnalyzer only**. Everythi
 | Compose / host scripts | `compose.prod.yml`, `deploy/single/`, `deploy/postgres/` | `compose.production.yml`, `deploy/ops/` |
 | Resources | `upcloud_server.app`, `upcloud_firewall_rules.app` | `upcloud_server.portfolio`, `upcloud_storage.data`, `upcloud_firewall_rules.portfolio` |
 | Hostname | `aiproductdemand-prod` | portfolio hostnames |
+| GitHub Environment | `aiproductdemand-production` (Phase 5.16.1) | `production` |
+| Secrets / state variables | `AIPD_*` (Environment-level only) | `UPCLOUD_TOKEN`, `TF_STATE_*` |
 
 ## Shared dependencies that remain (documented risk)
 
-* Both families use the GitHub Environment named `production` and the same secret names (`UPCLOUD_TOKEN`, `TF_STATE_*`). Isolation therefore depends on code guards, not on separate secrets. Preferred hardening (owner action): a distinct Environment (for example `aiproductdemand-production`) holding only this project's secrets.
-* Dedicated code imports `infrastructure/automation.py` as a library (protected-environment check, saved-plan protocol). Dedicated entrypoints rebind its Terraform root, summary, plan-object path, workflow list and fingerprint (see `configure()`); tests assert this.
+* Resolved in Phase 5.16.1: dedicated workflows use their own Environment, `aiproductdemand-production`, and `AIPD_*` secret names. Dedicated automation rejects `production`, and shared workflows are unchanged.
+* Dedicated code still imports `infrastructure/automation.py` for low-level helpers only: `run`, `github`, `state_init`, `catalog`, `verify_run` and `ci`. It owns its Environment check, plan, apply, destroy and metadata. `state_init` is pointed at `infra/terraform` and the dedicated fingerprint.
+* Same S3 bucket with separate prefixes is acceptable only with a dedicated IAM principal; see [TERRAFORM_STATE_DECISION.md](TERRAFORM_STATE_DECISION.md).
 * `docker-build.yml` is shared and runs on `workflow_run`. The dedicated deployment builds its own images and does not use it.
 
 ## Guards (all fail closed; covered by `infra/tests/test_isolation.py`)
 
-* `guards.require_dedicated`: Terraform root, state key, project, environment, hostname and a `sg-*` zone.
-* `guards.validate_plan`: exactly one `upcloud_server.app` and one `upcloud_firewall_rules.app`; rejects other resources, indexed/data/duplicate resources, non-Singapore zones, public ports other than 22/80/443, world-open SSH and, outside destroy, any delete/replace.
+* `guards.require_dedicated`: Terraform root, state key, project, environment, hostname and a zone from the code allowlist (`sg-sin1`). `guards.require_environment` and `guards.require_workflow` check the dedicated GitHub Environment and the workflow identity.
+* `guards.validate_plan`: exactly one `upcloud_server.app` and one `upcloud_firewall_rules.app` across `resource_changes` and `planned_values`, with exact server values and the exact ordered firewall policy. See [Phase 5.16.1](PHASE_5_16_1_SECURITY_HARDENING.md).
 * `guards.plan_object_path`: project-scoped S3 prefix with numeric run id and fixed object names.
-* Mutating workflows are `workflow_dispatch` only, bound to the `production` Environment with non-cancelling concurrency; no `workflow_run` chaining; the application deploy workflow contains no Terraform and no `UPCLOUD_TOKEN`.
+* Mutating workflows are `workflow_dispatch` only, bound to the `aiproductdemand-production` Environment with non-cancelling concurrency; no `workflow_run` chaining; the application deploy workflow contains no Terraform and no `UPCLOUD_TOKEN`.
 * Shared mutating workflows carry an `OUT OF SCOPE` header comment. Nothing was removed.

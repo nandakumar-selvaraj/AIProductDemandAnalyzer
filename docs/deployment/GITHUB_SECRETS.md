@@ -2,14 +2,21 @@
 
 No secret values were inspected or generated.
 
-| Protected production secret | Purpose |
-|---|---|
-| `UPCLOUD_TOKEN` | Existing UpCloud API credential |
-| `TF_STATE_ACCESS_KEY_ID`, `TF_STATE_SECRET_ACCESS_KEY` | Approved S3/KMS state/private plan access |
-| `DEPLOY_SSH_PRIVATE_KEY` | Distinct restricted deployer key |
-| `DEPLOY_SSH_KNOWN_HOSTS` | Console-verified SSH host identity |
+All dedicated values live in the **`aiproductdemand-production`** GitHub Environment (Phase 5.16.1), never at repository or organization level. Names are namespaced so a same-named repository or organization secret cannot be picked up as a fallback. The shared `production` Environment and its `UPCLOUD_TOKEN` are not used by dedicated workflows.
 
-Protected variables: `TF_STATE_BUCKET`, `TF_STATE_REGION`, `TF_STATE_KMS_KEY`, `SINGLE_UPCLOUD_ZONE` (sg-sin1 default), required `SINGLE_UPCLOUD_PLAN`, `SINGLE_STORAGE_TIER` (standard default), `SINGLE_OPERATOR_PUBLIC_KEY`, `SINGLE_DEPLOY_PUBLIC_KEY`, `SINGLE_SSH_ALLOWED_CIDRS` (JSON), `SINGLE_DEPLOY_HOST`, `SINGLE_DEPLOY_RUNNER_LABEL`.
+| Environment secret | Purpose |
+|---|---|
+| `AIPD_UPCLOUD_TOKEN` | UpCloud API credential; owner adds it (the value is never copied by automation) |
+| `AIPD_TF_STATE_ACCESS_KEY_ID`, `AIPD_TF_STATE_SECRET_ACCESS_KEY` | Dedicated IAM principal scoped to this project's state, lock, plan prefix and KMS key |
+| `AIPD_DEPLOY_SSH_PRIVATE_KEY` | Distinct unencrypted OpenSSH Ed25519 deployer key (structure-checked) |
+| `AIPD_DEPLOY_SSH_KNOWN_HOSTS` | Exactly one `IP ssh-ed25519 KEY` line, console-verified |
+
+Environment variables, all required with no workflow defaults:
+
+* State: `AIPD_TF_STATE_BUCKET`, `AIPD_TF_STATE_REGION`, `AIPD_TF_STATE_KMS_KEY`.
+* Server: `SINGLE_UPCLOUD_ZONE` (must be `sg-sin1`), `SINGLE_UPCLOUD_PLAN`, `SINGLE_STORAGE_TIER` (`standard` or `maxiops`).
+* SSH keys: `SINGLE_OPERATOR_PUBLIC_KEY`, `SINGLE_DEPLOY_PUBLIC_KEY`.
+* Access and deployment: `SINGLE_SSH_ALLOWED_CIDRS` (JSON list of public IPv4 networks, /24 or narrower), `SINGLE_DEPLOY_HOST`, `SINGLE_DEPLOY_HOST_KEY_FINGERPRINT` (`SHA256:...`, from the console), `SINGLE_DEPLOY_RUNNER_LABEL`.
 
 Runtime-only secrets: `POSTGRES_PASSWORD` (owner), `APP_DB_PASSWORD` (runtime), exact backend name `JWT_SIGNING_SECRET`; `DATABASE_URL` and `MIGRATION_DATABASE_URL` contain secret credentials too. Install manually as `/etc/demand/runtime.env`, root:root 0600, from example. These do not need GitHub copies because workflow does not transport them. If recovery policy stores copies in GitHub, use protected Environment secrets under these names; workflows do not consume them.
 

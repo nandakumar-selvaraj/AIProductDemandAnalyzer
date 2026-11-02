@@ -2,6 +2,10 @@
 
 Preparation only. No live/cloud-backed check is implied by a local PASS. Local Docker Engine 29.1.3 was accessed for disposable validation; no cloud resources, real administrator or deployment was created.
 
+## Phase 5.16.1 security hardening — source READY FOR REVIEW, live BLOCKED
+
+Dedicated GitHub Environment `aiproductdemand-production`, namespaced secrets, complete plan and firewall policy, and pinned SSH host fingerprint. Infrastructure tests: 212 passed. Backend: 200 passed, 1 skipped. Angular: 266 passed, lint passed. Terraform, Actionlint, Trivy and Docker checks: NOT TESTED in this session (Docker daemon unavailable). See [Phase 5.16.1](PHASE_5_16_1_SECURITY_HARDENING.md).
+
 ## Current remediation result — PASS
 
 The image vulnerability blocker has been resolved. All four repaired dedicated runtime artifacts scan with zero HIGH/CRITICAL findings, with no exceptions. Backend200 tests, Angular266 tests, infrastructure33 tests, Terraform2 mock tests and separate PostgreSQL integration passed. See [current exact validation commands/results](REMEDIATION_VALIDATION.md) and [security identities/evidence](IMAGE_SECURITY.md). The table below records the earlier preparation run, including its historical failures; it is superseded for image readiness by these current reports. Live acceptance remains untested/approval-gated.

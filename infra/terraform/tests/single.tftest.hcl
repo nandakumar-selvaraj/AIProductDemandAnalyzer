@@ -28,6 +28,14 @@ run "single_server_defaults" {
     ])
     error_message = "Non-root containers must be able to read their mounted configuration/initializer."
   }
+  assert {
+    condition = alltrue([
+      for f in yamldecode(upcloud_server.app.user_data).write_files :
+      strcontains(f.content, "PasswordAuthentication no") && strcontains(f.content, "AuthenticationMethods publickey") && strcontains(f.content, "ForceCommand sudo -n /usr/local/sbin/demand-release") && strcontains(f.content, "PermitTunnel no")
+      if f.path == "/etc/ssh/sshd_config.d/00-demand-initial.conf"
+    ])
+    error_message = "SSH must be key-only and the deployer restricted to the release command."
+  }
 }
 
 run "reject_world_open_ssh" {
