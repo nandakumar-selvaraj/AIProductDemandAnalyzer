@@ -1,0 +1,4 @@
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/touch /var/lib/demand/attention-required
+ExecStart=/usr/bin/logger -p daemon.err -t demand-alert "Demand host/backup failure; owner action required"

@@ -1,0 +1,8 @@
+[Unit]
+Description=Host capacity and backup monitoring
+OnFailure=demand-alert.service
+[Service]
+Type=oneshot
+ExecStart=/opt/demand/host-monitor.sh
+StandardOutput=null
+StandardError=null

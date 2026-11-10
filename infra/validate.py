@@ -47,7 +47,7 @@ def main():
     for path in (ROOT / ".github/workflows").glob("single-*.yml"):
         value = yaml.safe_load(path.read_text())
         triggers = value.get("on", value.get(True))  # PyYAML uses YAML 1.1 booleans.
-        if path.name != "single-validate.yml":
+        if path.name not in {"single-validate.yml", "single-publish-images.yml"}:
             assert set(triggers) == {"workflow_dispatch"}
     for name in DOCUMENTS:
         assert (ROOT / "docs/deployment" / (name + ".md")).is_file(), name

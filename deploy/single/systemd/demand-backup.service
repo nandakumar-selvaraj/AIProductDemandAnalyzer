@@ -1,0 +1,9 @@
+[Unit]
+Description=Encrypted off-server PostgreSQL backup
+OnFailure=demand-alert.service
+[Service]
+Type=oneshot
+ExecStart=/opt/demand/backup.sh
+UMask=0077
+StandardOutput=null
+StandardError=null

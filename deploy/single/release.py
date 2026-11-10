@@ -168,6 +168,8 @@ def main():
     os.umask(0o077)
     private(Path("/etc/demand/runtime.env"))
     private(BASE)
+    run(["/opt/demand/host-check.sh"])
+    run(["/opt/demand/backup-preflight.sh"])
     if not Path("/etc/demand/tls-ready").is_file():
         raise ValueError(
             "Manual DNS, certificate and HTTPS acceptance gate is incomplete"
@@ -204,6 +206,8 @@ def main():
                 # Volume is created once by an operator; never implicitly replace a missing volume.
                 run(["docker", "volume", "inspect", "demand-single-database"])
             compose(value, "up", "-d", "--wait", "--wait-timeout", "120", "db")
+            if not old:
+                run(["/opt/demand/backup.sh", "--bootstrap"])
             try:
                 compose(value, "run", "--rm", "--no-deps", "migrate")
             except Exception:

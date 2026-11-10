@@ -35,6 +35,7 @@ WORKFLOWS = {
     "apply": "single-terraform-apply.yml",
     "destroy": "single-terraform-destroy.yml",
     "deploy": "single-deploy-production.yml",
+    "publish": "single-publish-images.yml",
 }
 PLAN_MAX_AGE = {"normal": 86400, "destroy": 3600}
 # Single-purpose workflows that may be named as required checks or plan producers.
