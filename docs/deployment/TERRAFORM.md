@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Terraform and secure state
 
 Root `infra/terraform`: Terraform 1.17.1, provider exactly 5.48.0, committed official checksums. One `upcloud_server.app` (encrypted persistent boot disk included), one `upcloud_firewall_rules.app`. No extra server, IP, database, load balancer, managed backup or Kubernetes. Labels identify project/environment; provider tags also have access-control meaning, so descriptive labels are used.

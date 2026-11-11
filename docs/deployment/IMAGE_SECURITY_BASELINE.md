@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 > Historical pre-remediation findings. Superseded by [current passing security report](IMAGE_SECURITY.md).
 
 # Runtime image security — FAIL

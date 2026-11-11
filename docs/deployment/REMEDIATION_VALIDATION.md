@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Image remediation validation — 2026-11-02
 
 **PASS: the four dedicated production runtime images have zero HIGH/CRITICAL vulnerability findings.** No scan exceptions, ignore files, severity downgrades or metadata-only removal were used. No UpCloud operation or production deployment was performed. Existing application dependency versions, endpoints, authentication and migrations remain unchanged.

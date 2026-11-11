@@ -1,3 +1,5 @@
+> LEGACY SHARED-PORTFOLIO / HISTORICAL GUIDE: inactive for the current dedicated Phase 5.17 deployment. Terraform/S3/KMS and shared deployment commands below must not be used for it. Use [manual provisioning](deployment/UPCLOUD_MANUAL_PROVISIONING.md), [SFTP backups](deployment/BACKUP_RESTORE.md) and [current validation](deployment/PHASE_5_17_FINAL_VALIDATION.md). Existing shared workflows/resources are preserved, not disabled or deleted.
+
 # Production deployment runbook
 
 Prepared for Linux Docker Compose; no deployment has been performed.

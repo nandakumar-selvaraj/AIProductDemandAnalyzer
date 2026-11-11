@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Phase 5 implementation report — 2026-11-02
 
 **READY FOR REVIEW after local image-security remediation.** All four dedicated runtime images pass the unchanged HIGH/CRITICAL gate with zero findings. Application dependency versions and behavior are preserved. This is not permission to provision or deploy; live configuration/acceptance gates remain. See [security evidence](IMAGE_SECURITY.md) and [remediation validation](REMEDIATION_VALIDATION.md).

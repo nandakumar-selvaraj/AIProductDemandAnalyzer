@@ -1,29 +1,30 @@
-# GitHub Actions
+# Active dedicated GitHub Actions — Phase 5.17
 
-Existing workflows are unchanged. Do not dispatch old shared VPS apply/deploy workflows for this dedicated deployment.
+Actions do not provision this dedicated host. Start with [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
 
-| Workflow | Behavior |
-|---|---|
-| `single-validate.yml` | Push/PR/manual, no credentials: fmt, backend-disabled init, provider/mock tests, Trivy, actionlint, shell syntax, Ruff, safety/source contracts, secret scan |
-| `single-terraform-plan.yml` | Manual protected environment: approved state/catalog checks, encrypted private saved plan and sanitized review summary |
-| `single-terraform-apply.yml` | Manual approval: exact plan run, commit/config/lockfile/digest/age/state verification; provision and stop |
-| `single-deploy-production.yml` | Manual master: require exact-commit existing backend/Angular/E2E/Docker/infra CI, build/publish backend/frontend/repaired PostgreSQL in GHCR, require PostgreSQL major16 and scan all four runtime digests; separate approved fixed-egress SSH deployment job |
-| `single-terraform-destroy.yml` | Manual `aiproductdemand-production` selection; destroy-plan followed by separate dispatch/approval of exact destroy-apply within one hour, with backup/restore/inventory confirmation |
+| Workflow | Trigger and gates |
+| --- | --- |
+| backend-ci.yml | Push/PR: backend lint/tests/migrations, Angular lint/tests/build, legacy production Compose build |
+| e2e.yml | Existing synthetic browser/database validation |
+| docker-validation.yml | Existing disposable production Docker integration |
+| single-validate.yml | Push/PR/manual: Compose Trivy, actionlint, shell syntax, safety tests, Ruff, source contracts and secret scan; no Terraform install |
+| single-publish-images.yml | Master push: waits for the four preceding workflows on the exact SHA, publishes GHCR backend/frontend/PostgreSQL, checks PostgreSQL16, scans all four runtime images, uploads a 30-day digest manifest |
+| single-deploy-production.yml | Manual master only, explicit compatible-schema attestation, successful same-SHA publication run and validated manifest, then independently approved SSH deployment |
 
-Dedicated jobs run in the **`aiproductdemand-production`** Environment (Phase 5.16.1); shared workflows keep `production`, unchanged. That Environment must require independent reviewers, prevent self-review, disable admin bypass and allow only a custom `master` branch policy.
+Only publication has package-write permission. Publication is automatic on master push; deployment is not. Expired/missing artifacts require reviewed publication rerun, never mutable tags. Host pull access to GHCR must be arranged separately.
 
-Before any state, cloud or SSH command, `infra/guards.py` checks three things:
+The deploy job uses aiproductdemand-production with independent required reviewer, self-review prevention, disabled admin bypass and custom master-only branch policy. infra/guards.py verifies these through GitHub before SSH. Live settings were not changed or verified. Missing protections fail closed.
 
-* `DEPLOYMENT_ENVIRONMENT` is the dedicated name (`production` is rejected);
-* those protections, through the GitHub API;
-* `GITHUB_WORKFLOW_REF` is the operation's own `single-*.yml` on `master`.
+SINGLE_DEPLOY_RUNNER_LABEL selects an isolated fixed-egress Linux runner, never the VPS. Configure this as a repository/organization configuration variable: runner selection cannot rely on job Environment variables being available yet. Other deployment values belong in the protected Environment. Missing label deliberately selects a nonexistent runner.
 
-YAML cannot create reviewer protection. If the repository's plan lacks support, live operations remain BLOCKED. See the [setup checklist](PHASE_5_16_1_SECURITY_HARDENING.md).
+Transport requires a distinct Ed25519 key and independently console-verified host pin. Only digest manifests cross SSH. Root-owned host code requires backup readiness, TLS marker, external DB volume, owner migration, matching heads and HTTPS/container health. Failed migrations stop for manual recovery; application rollback preserves storage and requires compatible schema.
 
-Only build job has package-write permission; deployment has read-only repository/actions/deployment permissions. State credentials are scoped to Terraform jobs. `SINGLE_DEPLOY_RUNNER_LABEL` selects an isolated Linux runner with Python/SSH and approved fixed egress, never the VPS. Missing label selects an intentionally nonexistent runner. Review build digests/schema compatibility before deployment approval. Transport also requires the new single-validate workflow to pass before SSH.
+## Historical and separate paths
 
-Host receives only digest manifest, never runtime secrets or registry write token. GHCR packages must be reviewed and made public, or host separately configured for read-only pulls. Missing pull access blocks release. Image publication precedes deployment approval but requires manual workflow dispatch.
+Dedicated single-terraform-plan/apply/destroy definitions are archived outside Actions discovery: HISTORICAL AND INACTIVE. No dedicated Terraform, AWS, S3 or KMS credentials are required.
 
-The approved ingress digest is in `deploy/single/images.json` (current Nginx namespace). The PostgreSQL recipe is `deploy/postgres/Dockerfile`; release/restore allowlists require the repaired project repository. No mutable upstream PostgreSQL/Nginx fallback is used by this dedicated workflow. Existing shared-portfolio workflows remain separate.
+Legacy shared terraform-validate/plan/apply.yml, docker-build.yml and production-deploy.yml remain discoverable and unchanged. They are NOT the dedicated path; do not dispatch their cloud operations. The whole repository still contains executable Terraform/AWS tooling. Active dedicated Python entry points import standard-library GitHub/subprocess helpers from infrastructure/automation.py, but do not invoke its state/catalog/plan/apply functions.
 
-Existing data backup, write stop, owner migration, Alembic heads, container and HTTPS checks precede success recording. Prior manifest retained. Migration failure needs manual assessment. See [rollback](ROLLBACK.md).
+The final report records failing stale workflow tests and formatting; source review does not establish green hosted workflows.
+
+Runner-selection scope: [GitHub variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables).

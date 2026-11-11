@@ -11,7 +11,7 @@
 | Release | `single-deploy-production.yml` builds/scans GHCR digests, then `infra/deploy_transport.py` | Retain protected dedicated environment and restricted SSH; separate automatic image publication from approved release |
 | Authorization | `infra/guards.py`, shared low-level GitHub helpers | Preserve master, independent review, no self-review/admin bypass, fixed egress and Ed25519 pin checks |
 | Runtime | `compose.prod.yml`, `deploy/single`, `deploy/postgres`, backend/ui Dockerfiles | Preserve external PostgreSQL 16 volume, internal DB network, owner migrations and nginx-only published ports |
-| Host setup | Dedicated cloud-init template | Add manual idempotent bootstrap with no cloud API, images or migrations |
+| Host setup | Dedicated cloud-init template | Manual bootstrap exists but rerun/lockout safety remains unverified; see final audit |
 | State | Dedicated AWS S3, KMS, AWS CLI, plan lock/approval | Retire from active dedicated path; retain historical material |
 | Backups | `backup.sh`, Restic S3, `restore-verify.sh` | Encrypted Restic over pinned SFTP to owner-controlled off-server host; require verified repository/restore before release |
 | Rollback | `release.py` records active/previous digests, verifies HTTPS/readiness | Preserve volume, reject DB image changes, no destructive schema rollback |
@@ -26,4 +26,4 @@ One manually provisioned Ubuntu 24.04 VPS in `sg-sin1`, Docker Compose, PostgreS
 
 Host provisioning is an owner operation. Application release is a separately approved GitHub operation. The deployer cannot update root-owned code, Compose files, TLS or secrets; owners install reviewed host artifacts manually. A release transfers only an allowlisted immutable image manifest over SSH.
 
-See [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md), [GitHub Actions](GITHUB_ACTIONS.md), [backup/recovery](BACKUP_RESTORE.md) and [acceptance](ACCEPTANCE.md). Final executed validation is recorded in [implementation report](IMPLEMENTATION_REPORT.md).
+See [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md), [GitHub Actions](GITHUB_ACTIONS.md), [backup/recovery](BACKUP_RESTORE.md) and [acceptance](ACCEPTANCE.md). Final executed validation is recorded in [final validation](PHASE_5_17_FINAL_VALIDATION.md).

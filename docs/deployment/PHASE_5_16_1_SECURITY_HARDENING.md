@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Phase 5.16.1: Final security hardening
 
 Scope: source changes and local validation only. No Terraform plan/apply/destroy, no UpCloud or AWS call, no GitHub setting change, no workflow dispatch, no secret read, no administrator creation, no deployment. Default branch re-verified as `master`.

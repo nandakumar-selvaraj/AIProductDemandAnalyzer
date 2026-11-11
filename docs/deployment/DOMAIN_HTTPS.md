@@ -1,3 +1,5 @@
+> Phase 5.17: follow [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [current audit stop gates](PHASE_5_17_FINAL_VALIDATION.md). Commands below are future separately authorized operations, not part of this audit. Active backups use [encrypted SFTP/Restic](BACKUP_RESTORE.md); no dedicated Terraform/S3/KMS is required.
+
 # Domain and HTTPS
 
 Stage A: public-IP operational inspection only. `nginx.stage-a.conf` allows ingress health and ACME challenge; app/login paths return503. No credentials over HTTP and no assumed IP certificate. API checks may run privately over operator SSH.

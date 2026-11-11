@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Runtime image security — PASS
 
 Remediation validated locally on 2026-11-02. All four dedicated production runtime images have zero HIGH/CRITICAL findings under Trivy 0.76.1. No vulnerabilities were ignored, no severity was downgraded, and no scanner metadata was removed. Historical findings are retained in [the baseline report](IMAGE_SECURITY_BASELINE.md).

@@ -1,3 +1,5 @@
+> Active path: owner manual provisioning, Docker Compose, GHCR and encrypted SFTP/Restic. Dedicated Terraform is inactive. See [final audit](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Dedicated Demo 3 architecture and baseline
 
 Preparation only, 2026-11-02. No application algorithms, authentication code or migrations changed.
@@ -23,10 +25,10 @@ One Ubuntu 24.04 VPS, one IPv4, 30 GB encrypted boot disk, explicit UTC time. On
 - Actual routes include `/api/v1/ingestion/sales`, `/api/v1/forecasts`, `/api/v1/forecasts/runs`, `/api/v1/forecasts/{run_id}/predictions`, `/api/v1/forecasts/{run_id}/evaluation`, `/api/v1/recommendations`; auth uses `/api/v1/auth/login`, `/me` and `/logout` beneath `/api/v1/auth`.
 - `/api/v1/health` checks process; `/api/v1/ready` checks DB SELECT 1. Release controller separately compares Alembic heads.
 - Existing JSON logging/safe structured errors are reused. Container logs rotate 10 MB x 3, host journal capped 200 MB. Do not enable secret/request-body logging or print Compose configuration.
-- Existing backend/unit/integration, Angular, Playwright, Docker and Terraform CI remain intact. See [acceptance](ACCEPTANCE.md) for current-run results.
+- Existing backend/unit/integration, Angular, Playwright, Docker CI remain active; dedicated Terraform provisioning is historical/inactive. See [acceptance](ACCEPTANCE.md) for current-run results.
 
 ## Deployment changes and blockers
 
-Existing `infrastructure/terraform`, `compose.production.yml`, `deploy/ops` and workflows target a shared portfolio/Caddy host. New `infra/terraform`, `compose.prod.yml`, `deploy/single` and `single-*` workflows target this app only. Dockerfiles are reused; frontend Nginx adds short-lived asset caching/index revalidation. Production Angular build disables critical-CSS inlining because its inline loader script would violate the Nginx self-only script CSP; full stylesheet loading remains external.
+Existing `infrastructure/terraform`, `compose.production.yml`, `deploy/ops` and workflows target a shared portfolio/Caddy host. The active dedicated path uses manual provisioning, compose.prod.yml, deploy/single and validation/publication/deployment workflows. Dedicated infra/terraform is historical/inactive. Dockerfiles are reused; frontend Nginx adds short-lived asset caching/index revalidation. Production Angular build disables critical-CSS inlining because its inline loader script would violate the Nginx self-only script CSP; full stylesheet loading remains external.
 
-Approve exact catalog plan/capacity/tier, state/backup destinations and costs, reviewer protection, fixed-egress transport, domain and runtime secrets before live work. Public Swagger is disabled by existing production policy. No public login/backup operation is claimed before live acceptance.
+Approve exact manual plan/capacity/tier, off-server SFTP backup destination and costs, reviewer protection, fixed-egress transport, domain and runtime secrets before live work. Public Swagger is disabled by existing production policy. No public login/backup operation is claimed before live acceptance.

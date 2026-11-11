@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Terraform state decision record (Phase 5.16)
 
 Status: **recommendation only. No backend was created, initialized or migrated.** Terraform is pinned to 1.17.1 and the UpCloud provider to 5.48.0.

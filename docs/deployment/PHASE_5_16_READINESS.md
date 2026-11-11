@@ -1,3 +1,5 @@
+> HISTORICAL AND INACTIVE for the Phase 5.17 dedicated manual deployment. Do not execute Terraform, AWS, S3/KMS or teardown instructions below. Preserve existing resources/state. Prior passes are not current evidence. Use [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [final validation](PHASE_5_17_FINAL_VALIDATION.md).
+
 # Phase 5.16 deployment readiness report
 
 > **Superseded in part by [Phase 5.16.1](PHASE_5_16_1_SECURITY_HARDENING.md).** Dedicated workflows now use the `aiproductdemand-production` Environment and `AIPD_*` secret and variable names (section F below is historical). Plan policy is now complete-inventory and exact-match, and transport pins a host-key fingerprint. Infrastructure tests: 212 passed.

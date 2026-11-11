@@ -1,3 +1,5 @@
+> Phase 5.17: follow [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md) and [current audit stop gates](PHASE_5_17_FINAL_VALIDATION.md). Commands below are future separately authorized operations, not part of this audit. Active backups use [encrypted SFTP/Restic](BACKUP_RESTORE.md); no dedicated Terraform/S3/KMS is required.
+
 # Existing authentication security assessment
 
 No authentication redesign was made.

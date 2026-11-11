@@ -1,6 +1,6 @@
 # AI Product Demand Analyzer
 
-Deployment readiness (Phase 5.16/5.16.1): [security hardening](docs/deployment/PHASE_5_16_1_SECURITY_HARDENING.md), [readiness report](docs/deployment/PHASE_5_16_READINESS.md), [dedicated vs shared infrastructure](docs/deployment/DEDICATED_VS_SHARED.md), [Terraform state decision](docs/deployment/TERRAFORM_STATE_DECISION.md).
+Deployment readiness (Phase 5.17): [final audit](docs/deployment/PHASE_5_17_FINAL_VALIDATION.md), [manual provisioning](docs/deployment/UPCLOUD_MANUAL_PROVISIONING.md), [active delivery](docs/deployment/GITHUB_ACTIONS.md). Dedicated Terraform/S3/KMS guidance is historical and inactive.
 
 Dedicated application deployment preparation: [architecture](docs/deployment/ARCHITECTURE.md),
 [implementation report](docs/deployment/IMPLEMENTATION_REPORT.md), and
@@ -81,7 +81,7 @@ The single-application deployment path is documented in
 [docs/deployment/ARCHITECTURE.md](docs/deployment/ARCHITECTURE.md), with
 [validation and live acceptance gates](docs/deployment/ACCEPTANCE.md) and the
 [implementation report](docs/deployment/IMPLEMENTATION_REPORT.md).
-It uses `infra/terraform`, `compose.prod.yml`, `deploy/single`, and `single-*` workflows.
+It uses owner-executed manual provisioning, compose.prod.yml, deploy/single, GHCR and dedicated validation/publication/deployment workflows. Dedicated Terraform is historical/inactive.
 Existing shared-portfolio deployment tooling remains available separately. Do not provision
 both paths for this application. Cloud provisioning, production account creation and deployment
 require separate explicit approval.
