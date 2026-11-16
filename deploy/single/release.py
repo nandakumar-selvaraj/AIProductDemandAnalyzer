@@ -169,7 +169,6 @@ def main():
     private(Path("/etc/demand/runtime.env"))
     private(BASE)
     run(["/opt/demand/host-check.sh"])
-    run(["/opt/demand/backup-preflight.sh"])
     if not Path("/etc/demand/tls-ready").is_file():
         raise ValueError(
             "Manual DNS, certificate and HTTPS acceptance gate is incomplete"
@@ -186,6 +185,7 @@ def main():
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (STATE / "operation.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        run(["/opt/demand/backup-preflight.sh"])
         active = STATE / "active.json"
         old = validate(json.loads(active.read_text())) if active.exists() else None
         if old and value["POSTGRES_IMAGE"] != old["POSTGRES_IMAGE"]:
@@ -200,14 +200,14 @@ def main():
                 raise ValueError("Rollback must select the previous successful release")
         else:
             if old:
-                run(["/opt/demand/backup.sh"])
+                run(["/opt/demand/backup.sh", "--release-lock-held"])
                 compose(old, "stop", "backend")
             else:
                 # Volume is created once by an operator; never implicitly replace a missing volume.
                 run(["docker", "volume", "inspect", "demand-single-database"])
             compose(value, "up", "-d", "--wait", "--wait-timeout", "120", "db")
             if not old:
-                run(["/opt/demand/backup.sh", "--bootstrap"])
+                run(["/opt/demand/backup.sh", "--release-lock-held", "--bootstrap"])
             try:
                 compose(value, "run", "--rm", "--no-deps", "migrate")
             except Exception:

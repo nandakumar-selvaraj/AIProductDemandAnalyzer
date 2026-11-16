@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+umask 077
+[[ $(id -u) = 0 && $# = 0 ]] || exit 1
+exec 9>/var/lib/demand/backup.lock
+flock -x 9
+trap 'if (( $? != 0 )); then /usr/bin/python3 -I /opt/demand/backup_state.py invalidate-restore; fi' EXIT
+# shellcheck source=deploy/single/backup-common.sh
 source /opt/demand/backup-common.sh
-receipt=/var/lib/demand/backup-restore-verified
-[[ ! -L $receipt && $(stat -c '%u:%a' "$receipt") = 0:600 ]] || exit 1
-[[ $(cat "$receipt") = "$(backup_config_digest)" ]] || exit 1
-age=$(( $(date +%s) - $(stat -c %Y "$receipt") ))
-(( age >= 0 && age <= 3024000 )) || exit 1
-restic_safe check >/dev/null 2>&1
+/usr/bin/python3 -I /opt/demand/backup_state.py preflight

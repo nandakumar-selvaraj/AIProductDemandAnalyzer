@@ -1,11 +1,10 @@
 # AI Product Demand Analyzer
 
-Deployment readiness (Phase 5.17): [final audit](docs/deployment/PHASE_5_17_FINAL_VALIDATION.md), [manual provisioning](docs/deployment/UPCLOUD_MANUAL_PROVISIONING.md), [active delivery](docs/deployment/GITHUB_ACTIONS.md). Dedicated Terraform/S3/KMS guidance is historical and inactive.
+Deployment readiness (Phase 5.17.1): [security remediation](docs/deployment/PHASE_5_17_1_SECURITY_REMEDIATION.md), [manual provisioning](docs/deployment/UPCLOUD_MANUAL_PROVISIONING.md), [active delivery](docs/deployment/GITHUB_ACTIONS.md). Dedicated Terraform/S3/KMS guidance is historical and inactive.
 
 Dedicated application deployment preparation: [architecture](docs/deployment/ARCHITECTURE.md),
 [implementation report](docs/deployment/IMPLEMENTATION_REPORT.md), and
-[validation and remaining gates](docs/deployment/ACCEPTANCE.md). All four dedicated runtime images
-now pass the HIGH/CRITICAL security gate; see [remediation evidence](docs/deployment/IMAGE_SECURITY.md).
+[validation and remaining gates](docs/deployment/ACCEPTANCE.md). Current delivery requires freshly scanned immutable images. Earlier image results are recorded in the [historical scan evidence](docs/deployment/IMAGE_SECURITY.md).
 Provisioning and deployment require separate explicit approval.
 Existing shared-portfolio tooling is documented in the [Phase 8A overview](docs/PHASE8A_INFRASTRUCTURE.md);
 do not provision both infrastructure paths for this application.

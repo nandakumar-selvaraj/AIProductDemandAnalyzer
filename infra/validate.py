@@ -36,6 +36,10 @@ def main():
         )  # Runtime digest substitution.
         if name != "nginx":
             assert "ports" not in service
+    assert compose["services"]["nginx"]["ports"] == [
+        "0.0.0.0:80:8080",
+        "0.0.0.0:443:8443",
+    ]
     assert compose["networks"]["database"]["internal"] is True
     assert compose["volumes"]["database"]["external"] is True
     assert (

@@ -19,12 +19,15 @@ jobs:
           python-version: '3.13'
       - name: Static security, workflows, scripts and deployment contracts
         run: |
-          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.76.1 config --exit-code 1 --severity HIGH,CRITICAL /src/compose.prod.yml
+          docker run --rm -v "$PWD:/src:ro" aquasec/trivy:0.76.1 config --exit-code 1 --severity HIGH,CRITICAL --file-patterns 'dockerfile:.*Dockerfile$' /src/backend/Dockerfile
           docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.12 -color
-          bash -n deploy/single/*.sh
+          for script in deploy/single/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -x deploy/single/*.sh
           python -m pip install -r infrastructure/requirements-validation.txt
-          python -m pytest infra/tests -q
-          ruff check infra deploy/single
-          ruff format --check infra deploy/single
+          python -m pytest infra/tests infrastructure/tests -q
+          ruff check infra infrastructure deploy/single
+          ruff format --check infra infrastructure deploy/single
           python infra/validate.py
           python infrastructure/check_secrets.py

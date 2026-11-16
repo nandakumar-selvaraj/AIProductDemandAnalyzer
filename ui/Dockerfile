@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build -- --configuration production
-FROM nginx/nginx-unprivileged:stable-alpine@sha256:44e74ca483234093081138b6d7b6f561d55557756a2deefc3a5056148defeb99
+FROM nginx/nginx-unprivileged:stable-alpine@sha256:ea4fd7ab5a8dc6348c18240bd3546f355f8373cd8f112580f7d8bd8ff5a74772
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/dist/ui/browser /usr/share/nginx/html
 EXPOSE 8080

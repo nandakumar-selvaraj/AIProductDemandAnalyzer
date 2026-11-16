@@ -22,4 +22,4 @@ Install reviewed BACKEND_IMAGE/FRONTEND_IMAGE/POSTGRES_IMAGE/NGINX_IMAGE digests
 
 Runtime backend never receives owner migration URL. Owner-configured migration service is used only for controlled migration/manual management. Docker daemon/root access remains operator/restricted-helper only. No commands above were executed against production.
 
-Initial backup prerequisite, only after separate runtime/storage authorization: using the reviewed DC array, run its Compose command with arguments up -d --no-deps --wait db. This starts the database only, not migration/backend/admin creation. Complete exact-snapshot SFTP restore acceptance and timer setup before release; current backup findings must first be remediated.
+Initial backup prerequisite, only after separate runtime/storage authorization: using the reviewed DC array, run its Compose command with arguments up -d --no-deps --wait db. This starts the database only, not migration/backend/admin creation. Complete exact-snapshot SFTP restore acceptance and timer setup before release; use the current backup and restore gates in [Backup and restore](BACKUP_RESTORE.md).

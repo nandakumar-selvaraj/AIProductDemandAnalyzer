@@ -1,9 +1,10 @@
 [Unit]
-Description=Encrypted off-server PostgreSQL backup
+Description=Daily encrypted PostgreSQL backup and isolated restore verification
 OnFailure=demand-alert.service
 [Service]
 Type=oneshot
 ExecStart=/opt/demand/backup.sh
+TimeoutStartSec=45min
 UMask=0077
 StandardOutput=null
 StandardError=null

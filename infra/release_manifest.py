@@ -33,18 +33,51 @@ def main():
     run = shared.verify_run(run_id, "single-publish-images.yml", sha)
     if run.get("event") != "push":
         raise ValueError("Publication must originate from master push CI")
+    artifacts = shared.github(
+        f"actions/runs/{run_id}/artifacts?name=single-release-manifest&per_page=100"
+    )
+    matches = [
+        item
+        for item in artifacts["artifacts"]
+        if item["name"] == "single-release-manifest"
+    ]
+    if (
+        artifacts["total_count"] != 1
+        or len(matches) != 1
+        or matches[0].get("expired") is not False
+    ):
+        raise ValueError("A unique, unexpired publication manifest is required")
     with tempfile.TemporaryDirectory() as folder:
-        shared.run(["gh", "run", "download", run_id, "--repo",
-                    os.environ["GITHUB_REPOSITORY"], "--name", "single-release-manifest",
-                    "--dir", folder])
-        value = validate(json.loads((Path(folder) / "release-manifest.json").read_text()), sha)
+        shared.run(
+            [
+                "gh",
+                "run",
+                "download",
+                run_id,
+                "--repo",
+                os.environ["GITHUB_REPOSITORY"],
+                "--name",
+                "single-release-manifest",
+                "--dir",
+                folder,
+            ]
+        )
+        value = validate(
+            json.loads((Path(folder) / "release-manifest.json").read_text()), sha
+        )
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         for name in REPOS:
             output.write(name + "=" + value[name] + "\n")
     Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
-        "Approved source and scanned immutable images:\n```json\n" + json.dumps(value, indent=2) + "\n```\n"
+        "Approved source and scanned immutable images:\n```json\n"
+        + json.dumps(value, indent=2)
+        + "\n```\n"
     )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print("Publication or release manifest verification failed.", file=sys.stderr)
+        raise SystemExit(1) from None

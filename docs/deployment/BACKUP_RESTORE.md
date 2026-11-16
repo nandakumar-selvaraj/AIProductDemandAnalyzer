@@ -1,33 +1,49 @@
-# Encrypted SFTP/Restic backup and recovery
+# Encrypted PostgreSQL backup, restore and retention
 
-Active dedicated scripts are deploy/single/{backup-common,backup-preflight,backup,restore-verify}.sh. Earlier S3/HTTPS object-storage instructions are HISTORICAL AND INACTIVE for this path. No backup account or repository was created.
+Use one authorized SFTP repository on a separate failure domain. Confirm the remote operator, storage, quota, transfer costs, recovery access and independent access controls. The host rejects its own assigned IPv4s, while the owner verifies the physical and administrative separation, including NAT. Plan for daily transfer and isolated restore capacity. Dedicated Terraform and AWS are inactive.
 
-pg_dump -Fc streams with pipefail directly into Restic client-side authenticated encryption over pinned SFTP. No plaintext dump is intentionally persisted. Use a separate public off-server IPv4, dedicated restricted SFTP account and independently verified host key. The script's hostname-based self-address check cannot prove a separate failure domain: verify different host/storage/account manually. Escrow the Restic password independently; losing it prevents recovery.
+## Setup and initial acceptance
 
-After separate authorization install the four root-owned 0600 files described in [configuration](GITHUB_SECRETS.md). Confirm repository capacity, access and retention. Owner root-shell commands for future authorized work:
+Use a dedicated restricted SFTP account and key, an independently verified pinned Ed25519 host key, and a separately escrowed Restic password. Store `backup.env`, `backup-key`, `backup-known-hosts` and `restic-password` under `/etc/demand` as root with mode 0600. See `deploy/single/backup.env.example` for variable names. Configure the preapproved SFTP repository and verify Restic can read its identity. Initializing a repository is a separately authorized operator action.
+
+Start only the reviewed PostgreSQL service and its external volume. Pull the approved PostgreSQL 16 digest first. Before the first migration, run:
 
 ```bash
-source /opt/demand/backup-common.sh
-restic_safe snapshots
-# Only for a separately authorized, confirmed NEW empty repository:
-# restic_safe init
+/opt/demand/backup.sh --bootstrap
+/opt/demand/backup-preflight.sh
 ```
 
-An unreachable repository is not permission to initialize or replace it. Diagnose connectivity, pin, password and destination.
+Bootstrap acceptance expects an empty, uninitialized application schema. After the first successful release, rerun `/opt/demand/backup.sh` and verify that the active schema and business evidence are accepted, then verify the daily timer and monitoring. The release host preflight requires the backup timer to be enabled. Enable it following initial backup acceptance, before first deployment. Start the monitoring timer after the TLS marker, runtime configuration and backup readiness are in place, before first deployment.
 
-After separately approved initial database-only setup with reviewed bootstrap image digests, run /opt/demand/backup.sh --bootstrap; later use /opt/demand/backup.sh. WARNING: this script also prunes snapshots (7 daily, 4 weekly, 2 monthly). Obtain retention/deletion authorization first; this audit did not execute it.
+```bash
+systemctl enable --now demand-backup.timer
+# After TLS and initial backup acceptance
+systemctl enable --now demand-monitor.timer
+```
 
-Select the exact snapshot from restic_safe snapshots --tag demand-single, then use /opt/demand/restore-verify.sh SNAPSHOT_ID. It checks all repository data and imports into isolated PostgreSQL with no network, public port or production volume, using pg_restore --exit-on-error. Data tmpfs is 512MB, memory limit 768MB; larger datasets need reviewed isolated capacity. Record snapshot, source revision, expected business counts/queries and measured restore time externally.
+The daily timer triggers at 02:00 UTC. Each backup invalidates old acceptance before reading configuration, then exports a read-only PostgreSQL snapshot. The source evidence query and `pg_dump -Fc` use that same transaction snapshot. Restic streams authenticated encrypted data over pinned SFTP and tags it with a unique operation ID. The host checks both subprocess statuses and resolves the full remote snapshot ID before recording completion. A failed or terminated stream may leave an orphaned remote snapshot. It cannot become a completed backup or count toward retention.
 
-## Open audit findings
+## Isolated restore and deployment gate
 
-- Bootstrap verification only runs SELECT 1; post-release checks read Alembic/auth tables but do not assert expected revision/counts. Successful import is real; semantic verification is incomplete.
-- A failed drill leaves an older receipt usable for up to 35 days. Receipt binds configuration, not snapshot/data. Preflight checks structure and receipt age, not a fresh restore. This is not strict fail-closed restore acceptance.
-- Failed pg_dump can still leave a partial snapshot finalized by Restic before pipefail reports failure. Never select latest without exact successful-backup evidence.
-- Prune occurs before the new snapshot passes restore verification. Review separate retention before production reliance.
+Backup automatically verifies its exact completed snapshot. To repeat a failed or planned drill, read the exact `id` and operation from the root-private `/var/lib/demand/backup-completed.json`, then run:
 
-Remediation and isolated failure-injection tests are required. Never fabricate a receipt or bypass preflight. See [final evidence](PHASE_5_17_FINAL_VALIDATION.md).
+```bash
+/opt/demand/restore-verify.sh FULL_SNAPSHOT_ID
+/opt/demand/backup-preflight.sh
+```
 
-After real off-host restore verification and approved retention, enable demand-backup.timer and verify timer/service/alerts. Bootstrap installs but does not enable it. Objectives: RPO <=24h (02:00 UTC daily plus pre-release), RTO <=2h for small demo data; neither measured nor guaranteed.
+A drill first removes the previous acceptance. It checks repository integrity and reads every byte of the selected authenticated archive into a new network-disabled PostgreSQL 16 restore container with no published ports or production mounts. The isolated target uses tmpfs (512 MB data, 768 MB memory cap). `pg_restore` uses one transaction and exits on error. The expected Alembic revision and authentication columns must match, as must the table counts and total units sold from the source transaction. The backup policy currently expects `0003_api_tokens`. Review and rehearse backup policy with future schema changes.
 
-Recovery requires separate approval: stop writes, preserve failed volume, restore into a NEW isolated empty database/volume, reconstruct owner/runtime grants, verify revision/business data/auth and compatible images, then switch after private acceptance. Dumps omit cluster roles. Never reset, downgrade, overwrite production data, run down -v or delete storage during ordinary recovery. Escrow runtime configuration, release manifests and keys separately; these scripts back up the DB, not the whole host.
+A successful restore and cleanup publish a root-owned 0600 receipt atomically. It binds the repository ID, configuration fingerprint, exact snapshot, backup operation, expected revision, data evidence, timestamp and integrity result. The release gate checks it against the latest completion and remote repository. A missing, failed, changed or more-than-26-hour-old backup blocks release. Pre-migration backups and daily backups both require restore acceptance. Manual backup and restore serialize with releases. If forced termination leaves a test container behind, identify the exact `demand-restore-*` ID and inspect it before owner cleanup. Never remove the production volume.
+
+Aim for a 24-hour scheduled recovery point plus an on-demand verified pre-migration backup. Measure restore time and capacity with representative data before go-live. The local rehearsal cannot establish an off-server production recovery time.
+
+## Explicit retention review
+
+```bash
+/opt/demand/backup-retention.sh
+```
+
+This command only returns an exact candidate list after current backup acceptance passes. It protects the latest accepted snapshot plus the most recent accepted point in each of 7 distinct UTC days, 4 ISO weeks and 2 calendar months. Incomplete, orphaned or unrecognized snapshots are excluded from both the keep calculation and deletion candidates. Backups, releases and timers never forget or prune.
+
+For separately approved deletion, pause backup and release scheduling in a reviewed maintenance window, regenerate the proposal, recheck repository identity and preserve the latest accepted recovery points. Use only the approved full snapshot IDs for an explicit Restic forget operation. Review prune separately after signed-off inventory and recovery checks. Keep independent copies or storage-side retention as appropriate. A failed backup or drill blocks the retention proposal until a new successful acceptance.

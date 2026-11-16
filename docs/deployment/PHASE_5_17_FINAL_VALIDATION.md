@@ -1,5 +1,7 @@
 # Phase 5.17 final validation — 2026-11-10
 
+> Historical baseline at the audit commit. See the [Phase 5.17.1 remediation and current decision](PHASE_5_17_1_SECURITY_REMEDIATION.md).
+
 ## Decision: NO-GO for manual VPS provisioning
 
 Audit target: master b38d84bedac71e7815506c7a3e795c31ffbae21e. Read-only git ls-remote confirmed remote master at this SHA. This working tree changes documentation only; no runtime, security policy, tests or workflows were weakened. No commit/push, cloud resource, GitHub setting, deployment, real administrator or storage deletion was performed.

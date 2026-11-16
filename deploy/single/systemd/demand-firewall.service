@@ -1,0 +1,16 @@
+[Unit]
+Description=Dedicated application input and Docker ingress firewall
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+Before=docker.service docker.socket network-pre.target shutdown.target
+Wants=network-pre.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/demand/docker-firewall.sh
+ExecReload=/opt/demand/docker-firewall.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

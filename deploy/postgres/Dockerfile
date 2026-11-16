@@ -1,4 +1,4 @@
-FROM postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+FROM postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
 # Replace the obsolete Go-based privilege switcher with Alpine's maintained native helper.
 # Keep PostgreSQL binaries/data layout; adapt only the entrypoint's privilege-drop command.
 RUN apk add --no-cache su-exec=0.3-r0 \

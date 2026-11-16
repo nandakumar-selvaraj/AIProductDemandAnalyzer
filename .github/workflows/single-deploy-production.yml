@@ -14,7 +14,6 @@ on:
 permissions:
   contents: read
   actions: read
-  deployments: read
 concurrency:
   group: aiproductdemand-application-production
   cancel-in-progress: false
@@ -36,6 +35,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python infra/ci.py
+      - name: Require the approved fixed-egress runner label
+        env:
+          RUNNER_LABEL: ${{ vars.SINGLE_DEPLOY_RUNNER_LABEL }}
+        run: test -n "$RUNNER_LABEL"
       - name: Verify publication and resolve scanned immutable manifest
         id: images
         env:
@@ -44,9 +47,14 @@ jobs:
         run: python infra/release_manifest.py
   deploy:
     needs: build
+    if: vars.SINGLE_DEPLOY_RUNNER_LABEL != ''
     environment: aiproductdemand-production
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
     # Isolated runner with fixed egress; never the production VPS and no internet-wide SSH.
-    runs-on: ${{ vars.SINGLE_DEPLOY_RUNNER_LABEL || 'demand-fixed-egress-not-configured' }}
+    runs-on: ${{ vars.SINGLE_DEPLOY_RUNNER_LABEL }}
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}

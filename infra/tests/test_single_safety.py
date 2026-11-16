@@ -58,7 +58,7 @@ def test_rollback_starts_images_without_requiring_old_schema_head(
     assert bool(revisions) == check_migrations
 
 
-@pytest.mark.parametrize("failure", ["migration", "health"])
+@pytest.mark.parametrize("failure", ["backup", "migration", "health"])
 def test_failure_preserves_release_and_does_not_downgrade(
     monkeypatch, tmp_path, failure
 ):
@@ -92,7 +92,13 @@ def test_failure_preserves_release_and_does_not_downgrade(
         SimpleNamespace(buffer=io.BytesIO(json.dumps(request).encode())),
     )
     commands, checks = [], []
-    monkeypatch.setattr(release, "run", lambda args: commands.append(args))
+
+    def run(args):
+        commands.append(args)
+        if failure == "backup" and args[0] == "/opt/demand/backup.sh":
+            raise RuntimeError("Synthetic restore acceptance failure")
+
+    monkeypatch.setattr(release, "run", run)
 
     def compose(value, *args):
         commands.append(args)
@@ -110,7 +116,9 @@ def test_failure_preserves_release_and_does_not_downgrade(
         release.main()
     assert json.loads((tmp_path / "active.json").read_text()) == old
     assert "downgrade" not in str(commands)
-    if failure == "migration":
+    if failure == "backup":
+        assert not checks and not any(args[0] == "run" for args in commands)
+    elif failure == "migration":
         assert not checks
         assert (
             "migration-failed-manual-recovery-required"

@@ -1,101 +1,87 @@
-# Manual UpCloud provisioning — owner execution only
+# Manual UpCloud provisioning
 
-Status: NO-GO pending [Phase 5.17 findings](PHASE_5_17_FINAL_VALIDATION.md). These are future owner steps, not permission to spend or execute. This audit creates no resources, administrators, volumes, certificates or GitHub settings. Do not run bootstrap while the SSH/rerun findings remain open.
+**NO-GO.** Owner execution requires the full disposable Ubuntu 24.04 amd64 VM rehearsal, reviewed CI evidence and separate approval for the Singapore cost. See the [Phase 5.17.1 report](PHASE_5_17_1_SECURITY_REMEDIATION.md).
 
 ## 1. Before spending
 
-1. Review the final report; resolve bootstrap and validation blockers and rehearse on a disposable LOCAL Ubuntu24.04 amd64 VM with console access. Test first run, rerun, injected failure and console recovery.
-2. Inventory existing UpCloud servers/disks/IPs, legacy Terraform-managed resources and backup destinations. If this app already has a host, stop and reconcile ownership. Never provision both shared and dedicated paths. Preserve all historical state.
-3. Obtain explicit owner approval of current Singapore sg-sin1 quote: one Ubuntu Server24.04 LTS amd64 machine, candidate2vCPU/4GB/30GB Starter, public IPv4, approved encrypted storage, no extra resources. Confirm budget including separate backup capacity and fixed-egress runner. No Terraform backend, API token, AWS, S3 or KMS is required.
-4. Prepare distinct operator and deployer Ed25519 keys locally; protect operator private key with passphrase. Only public keys go to the server. Record operator public IPv4 /32 and isolated runner egress /32 (at most20 approved global IPv4 CIDRs, /24 or narrower). Never allow world-open SSH.
-5. Establish and test an out-of-band recovery method with the provider. Opening a web console alone is not enough: after accounts are password-locked, confirm how recovery/rescue access works without SSH. Keep recovery instructions and access outside the VPS.
+1. Inventory existing servers, disks, IPs, legacy Terraform resources and the separate backup destination. If a host already serves this app, stop and reconcile ownership. Preserve historical state.
+2. Approve the exact Singapore `sg-sin1` quote for one Ubuntu Server 24.04 LTS amd64 VPS, public IPv4 and encrypted storage. Review the candidate Starter 2 vCPU, 4 GB, 30 GB sizing and include SFTP capacity, transfer costs, taxes and fixed-egress CI. Use an existing approved backup failure domain.
+3. Prepare distinct operator and deployer Ed25519 keys. Passphrase-protect the operator key. Prepare operator and runner public IPv4 /32s, or approved public networks /24 or narrower. Confirm the fixed-egress runner is outside the VPS.
+4. Rehearse packages, fresh install, repeat preparation, failed preparation, interruption and recovery, SSH through approved and disallowed sources, IPv6 denial, Docker DNAT and restart, and boot persistence. Keep a tested provider-console root recovery method outside the VPS.
 
-## 2. Owner control-panel operation — separate authorization
+## 2. Control panel and initial access
 
-Use [UpCloud deployment guide](https://upcloud.com/docs/guides/deploy-server/). In the control panel review existing inventory, choose sg-sin1, exact approved plan/template/storage and hostname aiproductdemand-prod. Upload only the operator public key, select key-based access, and do not paste private keys, runtime secrets or historical cloud-init. Confirm the final price and exactly one server before the owner clicks Deploy.
+After separate approval, choose the approved plan, Ubuntu template, storage and hostname `aiproductdemand-prod`. Upload only the operator public key for initial provider access. Record the instance, disk and IPv4 in inventory. Stop at the IPv4 for the subdomain owner. [UpCloud server deployment guide](https://upcloud.com/docs/guides/deploy-server/)
 
-Configure [UpCloud firewall](https://upcloud.com/docs/guides/managing-firewall/) before exposing services: inbound TCP22 only from approved operator/runner CIDRs, TCP80/443 public IPv4, required diagnostic ICMP, then inbound drop; outbound allowed for approved package/GHCR/ACME/SFTP access. Verify rule order and firewall enabled. Assign no public IPv6; do not open5432,8000,8080,8443 or11434. If the panel cannot stage firewall restrictions before creation, review its safe provisioning procedure before continuing.
+Configure the provider firewall with IPv4 TCP 22 restricted to the approved CIDRs, IPv4 TCP 80 and 443, approved diagnostic ICMP and default drop. Use IPv4 only. The provider firewall is stateless. Verify the reviewed rules permit return traffic needed by approved DNS, HTTPS and SFTP egress while the host firewall admits only tracked responses. Test package downloads and inbound access during the isolated rehearsal, and test the provider policy under separate authorization. [UpCloud firewall rules](https://upcloud.com/docs/guides/managing-firewall/)
 
-Record server UUID, disk UUID, region, plan, price and IPv4 in the owner's inventory. STOP at IPv4. Inform the subdomain owner yourself; wait for the A record. Do not deploy the app or create application administrators.
-
-## 3. Trusted access and source preparation — after separate approval
-
-From trusted provider console, record:
+Obtain the host key and its fingerprint directly from the trusted console.
 
 ```bash
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 cat /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-Construct a workstation known-hosts file containing IPv4 plus that public host key. Compare fingerprint independently before SSH; never accept a network-only ssh-keyscan result as proof.
+Use the console-obtained key in a dedicated known-hosts file. Keep the initial SSH session and an authenticated root console open. Stage the reviewed, root-owned checkout under `/root/aipd-reviewed` and the two public keys under `/root`. Verify the commit and ownership of the checkout and all parent directories. Require the stock supported SSH Include layout, installed `sshd`, `sudo` and `iptables-save` utilities, a synchronized clock, unused dedicated account names and homes, and no active legacy firewall or prior container installation. Stop on conflicts.
 
-Workstation example (replace paths/IP with owner-reviewed values):
+## 3. Stage A prepares access
 
-```bash
-ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=./demand-known-hosts -i ./operator-key root@APPROVED_IPV4
-```
-
-Use the initial image account documented by the provider if different. Keep original SSH and trusted console open. Stage a reviewed checkout/archive under /root/aipd-reviewed and the two public keys under /root. Verify its exact reviewed commit/hash; do not download and pipe scripts into sudo.
-
-Root shell preflight, read-only:
+From the existing root console or initial root shell, run the following after replacing the example addresses with approved values.
 
 ```bash
-id -u
-cat /etc/os-release
-dpkg --print-architecture
-sshd -t
-sshd -T
-ufw status numbered
-ip -4 route
-getent passwd operator deployer
-getent group docker
-test -d /root/aipd-reviewed/deploy/single
-bash -n /root/aipd-reviewed/deploy/single/bootstrap-host.sh
+bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh prepare \
+  /root/operator.pub /root/deployer.pub OPERATOR_PUBLIC_IP/32 RUNNER_PUBLIC_IP/32
 ```
 
-Require uid0, Ubuntu24.04, amd64, known user/home ownership, no conflicting Docker packages, no broad pre-existing UFW/SSH rules. Stop on differences. Review existing services/data; this installer is not a host migration tool.
+Preparation creates the dedicated accounts, separate primary groups, public keys and validated sudoers file. It preserves the initial SSH daemon configuration and existing recovery access. It prints an expiring challenge and the host key fingerprint. Repeat preparation with identical inputs while staged to issue a new challenge. Complete the other stages within 30 minutes of that challenge, with adequate time for package installation. An interrupted account setup blocks retries until reviewed from the console.
 
-## 4. Bootstrap hold gate and eventual command
+## 4. Stage B proves independent access
 
-Current bootstrap overwrites authorized_keys and reloads restrictive SSH without proving a new operator session. KEY-ACCESS-VERIFIED is only an attestation. Reruns accumulate firewall allow rules, overwrite root-owned artifacts and do not atomically recover configuration failures. Do not execute as-is on the paid host until the audit findings are remediated and rehearsed.
-
-After that remediation, the intended interface is:
+Open a **new, non-multiplexed** operator connection from an approved source. Pin the console-obtained host key. Disable connection sharing for this proof.
 
 ```bash
-# FUTURE ONLY: keep tested recovery console and old session open.
-bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh KEY-ACCESS-VERIFIED   /root/operator.pub /root/deployer.pub OPERATOR_PUBLIC_IP/32 RUNNER_PUBLIC_IP/32
+ssh -o ControlMaster=no -o ControlPath=none -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=./demand-known-hosts -o IdentitiesOnly=yes \
+  -i ./operator-key operator@APPROVED_IPV4
 ```
 
-The two keys must differ. Verify a second operator SSH login and sudo -n true before closing initial access or disabling root access. If the implementation cannot separate key installation/verification from final SSH hardening, STOP; do not compensate by claiming the attestation was satisfied.
-
-Inspect effective policy for operator and deployer, not syntax alone:
+In that new SSH session, run:
 
 ```bash
-sshd -t
-sshd -T -C user=operator,host=localhost,addr=OPERATOR_PUBLIC_IP
-sshd -T -C user=deployer,host=localhost,addr=RUNNER_PUBLIC_IP
-visudo -c
-ufw status numbered
-iptables -S DOCKER-USER
-iptables -S DEMAND-INGRESS
-docker version
-docker compose version
-systemctl is-active docker
-sysctl net.ipv6.conf.all.disable_ipv6
+sudo -n bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh verify CHALLENGE
 ```
 
-Require root/password/interactive SSH disabled, operator key access working, deployer forced-command/no forwarding/no TTY, neither user in docker group, only22 from approved sources and80/443 exposed. Test from allowed and disallowed source networks. Check Docker filtering again after a reviewed daemon restart/reboot; bootstrap currently does not restart an existing daemon for changed logging configuration.
+The verifier requires the sudo operator identity and a fresh successful OpenSSH Ed25519 login journal entry tied to the session process, the prepared public key and the approved source address. In the separate authenticated root provider console, run:
 
-## 5. Failure and rerun recovery
+```bash
+bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh recovery CHALLENGE
+```
 
-Keep the original shell/console open. If sshd -t fails, do not reload. If access fails, use the already tested provider recovery channel; restore the owner-saved known-good SSH/sudo/firewall configuration, validate syntax and reopen only the exact approved operator source. Do not flush firewalls, enable password/world-open root login, delete disks or reprovision as a shortcut. If no tested recovery method exists, do not begin.
+It requires a local virtual or serial terminal. Keep both verified sessions available. Resolve missing journal entries, absent console access or a host identity mismatch before proceeding.
 
-Before any rerun compare installed keys/configuration, retain root-only copies and plan a maintenance window. Do not use bootstrap as key rotation, firewall CIDR removal, package migration or release update. Current rerun safety has not passed a real host test.
+## 5. Stage C finalizes the host
 
-## 6. Stop and later handoff
+From the console with both proof records current:
 
-Host preparation does not start app images, migrations or administrators. Record proof of access, firewall, clock/updates, Docker and recovery; stop for owner review. Domain/DNS/TLS and runtime setup require separate approval.
+```bash
+bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh finalize CHALLENGE
+bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh check
+```
 
-Later order: approved GHCR digests and root-only runtime files; [Compose](DOCKER_COMPOSE.md) external volume/database-only setup; [encrypted SFTP backup and isolated restore](BACKUP_RESTORE.md); enable verified backup timer; friend-provided A record with no stale AAAA; [HTTPS](DOMAIN_HTTPS.md); protected [application release](GITHUB_ACTIONS.md); external acceptance. Never create a receipt/TLS marker to bypass failed checks. Admin creation is a separate owner operation after deployment, not bootstrap.
+Finalization is a one-time operation for a fresh host. It rejects existing customized targets, container data and active legacy rule sets. It validates staged candidates, commits only the dedicated nftables table, and loads the firewall before Docker installation can start the daemon. The systemd dependency loads the guard before Docker and its activation socket at boot. The host applies IPv4 default-drop input/forward rules and explicit IPv6 drops. Forwarded ingress must be Docker DNAT from IPv4 ports 80/443 to the exact Nginx ports. Compose binds only those two IPv4 ports. Test DHCP/address renewal, Docker restart, routing and reboot on the disposable VM before provisioning.
 
-No active dedicated step uses Terraform, AWS or S3. Archived dedicated instructions are historical and inactive. Legacy shared workflows must not be dispatched.
+The SSH candidate is checked before publication and again before reload using `sshd -t`, `sshd -T -C` and `visudo -c`. Verify another operator login and sudo after reload, reject root SSH and test deployer restrictions. Keep the original sessions open until those checks and console recovery pass.
+
+Use `check` for subsequent inspection. For an approved CIDR change, keep the verified operator source in the complete replacement list and use the root console:
+
+```bash
+bash /root/aipd-reviewed/deploy/single/bootstrap-host.sh firewall-update OPERATOR_PUBLIC_IP/32 NEW_RUNNER_PUBLIC_IP/32
+```
+
+This removes obsolete entries from the dedicated table in one checked transaction. If interrupted between persisting the candidate and runtime commit, active rules remain a complete policy. Compare `nft list table inet demand_ingress` with `/etc/demand/firewall.nft` at the console before retrying. Coordinate the separately administered provider rules and test the new runner before removing its old route. Changing the verified operator source, migrating an existing Docker host, or changing privileged assets requires separate maintenance.
+
+## 6. Failure recovery and later handoff
+
+A rejected SSH candidate leaves the original running daemon policy. A validation or reload failure after publishing restores the original fragment set when possible. Use the retained console and `/var/lib/demand/sshd-before.conf` plus the original unchanged drop-ins to investigate. A force kill can happen outside cleanup. Review the live and boot configuration from the console, repair it to the known policy, and confirm approved access. Keep narrowly scoped firewall rules and key-only access during recovery. An interrupted finalization leaves `finalize-in-progress.json` and blocks a fresh retry. Review what completed, preserve data, and repair under the owner’s maintenance procedure.
+
+Finalization starts infrastructure services only. After separate runtime authorization, install reviewed GHCR digests and root-private runtime files, arrange [Compose database-only setup](DOCKER_COMPOSE.md), obtain [encrypted backup and isolated restore acceptance](BACKUP_RESTORE.md), configure DNS and [HTTPS](DOMAIN_HTTPS.md), then approve the [application release](GITHUB_ACTIONS.md). Create the production application administrator separately after release using the owner migration service. Dedicated Terraform and its state backend are inactive.

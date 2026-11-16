@@ -1,5 +1,6 @@
 """Disposable local validation only. Never reads production configuration or uses public ports."""
 
+import argparse
 import json
 import os
 import shutil
@@ -25,6 +26,14 @@ def run(args, *, env=None, input=None):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--frontend-image", default="demand-phase5-frontend-check:latest"
+    )
+    parser.add_argument(
+        "--postgres-image", default="demand-phase5-postgres-check:latest"
+    )
+    args = parser.parse_args()
     project = "demand-check-" + uuid.uuid4().hex[:12]
     validation = ROOT / "validation"
     validation.mkdir(exist_ok=True)
@@ -49,8 +58,8 @@ def main():
         env = {
             **os.environ,
             "BACKEND_IMAGE": "demand-phase5-backend-check:latest",
-            "FRONTEND_IMAGE": "demand-phase5-frontend-check:latest",
-            "POSTGRES_IMAGE": "demand-phase5-postgres-check:latest",
+            "FRONTEND_IMAGE": args.frontend_image,
+            "POSTGRES_IMAGE": args.postgres_image,
             "NGINX_IMAGE": json.loads((ROOT / "deploy/single/images.json").read_text())[
                 "nginx"
             ],

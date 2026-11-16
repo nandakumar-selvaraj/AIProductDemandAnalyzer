@@ -1,11 +1,9 @@
 # SSH and host recovery
 
-The authoritative procedure is [manual provisioning](UPCLOUD_MANUAL_PROVISIONING.md). Current bootstrap has unresolved lockout/rerun risks; do not execute it on the paid host until remediated and locally rehearsed.
+Use the three-stage [manual provisioning procedure](UPCLOUD_MANUAL_PROVISIONING.md). Keep the initial access channel, an independent verified operator session and an authenticated provider console available while changing SSH and firewall policy. The operator login proof binds the prepared Ed25519 public key, approved source, host identity and current sudo session. The recovery proof requires a local root console.
 
-Use distinct operator and deployer Ed25519 keys. The operator has full sudo recovery authority; the deployer must have only the root-owned release entrypoint, forced command, no TTY or forwarding and no Docker membership. Protect operator private key with a passphrase; CI receives only its separate deployment key.
+Use distinct Ed25519 identities. The operator has recovery sudo. The deployer has only the fixed `/usr/local/sbin/demand-release` command, restricted key options, no forwarding or TTY, and no Docker group access.
 
-Verify host Ed25519 fingerprint through trusted console, then pin the single exact IPv4/key in AIPD_DEPLOY_SSH_KNOWN_HOSTS and fingerprint in SINGLE_DEPLOY_HOST_KEY_FINGERPRINT. Never trust ssh-keyscan alone. Verify effective sshd settings for both users, second-session operator sudo, allowed/disallowed source networks and recovery before closing original access.
+Verify the host key out of band. Pin the single exact IPv4 and key in `AIPD_DEPLOY_SSH_KNOWN_HOSTS` and the independently obtained fingerprint in `SINGLE_DEPLOY_HOST_KEY_FINGERPRINT`. Compare the live fingerprint with the console value before entering credentials or confirming an SSH identity. Repeat after a reviewed host rebuild or key rotation.
 
-Cloud and host firewalls allow22 only from approved operator/runner IPv4 CIDRs,80/443 publicly, diagnostics as reviewed, then inbound drop. No public IPv6, PostgreSQL or Ollama. Use an isolated fixed-egress runner outside the VPS. Host firewall rules must be inspected for pre-existing broad allowances; default deny does not remove them.
-
-Historical Terraform/cloud-init and demand-harden-ssh installation instructions are inactive for this manual path. bootstrap-host.sh installs its own SSH policy; do not assume the historical helper is installed.
+If a stage fails, retain authenticated sessions. Inspect the effective configuration at the console, keep both network policies scoped to approved operator sources, and use the saved baseline and owner recovery procedure. Before authorizing provisioning, rehearse SSH and console recovery at reboot and after failed candidate activation.
